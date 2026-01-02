@@ -1,0 +1,3 @@
+[submodule "sysy-cmake-template"]
+	path = sysy-cmake-template
+	url = git@github.com:pku-minic/sysy-cmake-template.git
