@@ -1,32 +1,31 @@
 #include <cassert>
-#include <fstream>
-#include <unordered_map>
+#include <cstdio>
+#include <iostream>
+#include <memory>
+#include <string>
 
 using namespace std;
 
-std::unordered_map<char, const char *> generator = {
-    {'k', R"(fun @main(): i32 {
-%entry:
-  ret 0
-}
-)"},
-    {'r', R"(  .text
-  .globl main
-main:
-  li a0, 0
-  ret
-)"},
-    {'p', R"(  .text
-  .globl main
-main:
-  li a0, 0
-  ret
-)"},
-};
+extern FILE *yyin;
+extern int yyparse(unique_ptr<std::string> &ast);
 
 int main(int argc, const char *argv[]) {
+  // compiler mode input_file -o output_file
   assert(argc == 5);
-  ofstream ofs(argv[4]);
-  ofs << generator[argv[1][1]];
+  auto mode = argv[1];
+  auto input = argv[2];
+  auto output = argv[4];
+
+  // Open the input file, and instruct the lexer to use the file
+  yyin = fopen(input, "r");
+  assert(yyin);
+
+  // Call parser function, parser will use lexer to read the file
+  unique_ptr<string> ast;
+  auto ret = yyparse(ast);
+  assert(!ret);
+
+  // Output the AST (which is a string)
+  cout << *ast << endl;
   return 0;
 }

@@ -19,6 +19,8 @@ else()
   add_compile_options(-Wall -Wno-register)
 endif()
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # options about libraries and includes
 set(LIB_DIR "$ENV{CDE_LIBRARY_PATH}/native" CACHE STRING "directory of libraries")
 set(INC_DIR "$ENV{CDE_INCLUDE_PATH}" CACHE STRING "directory of includes")

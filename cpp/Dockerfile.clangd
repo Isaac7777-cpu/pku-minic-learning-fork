@@ -1,0 +1,2 @@
+FROM maxxing/compiler-dev
+RUN apt-get update && apt-get install -y clangd && rm -rf /var/lib/apt/lists/*
