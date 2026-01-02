@@ -1,13 +1,12 @@
+#include "ast.hpp"
 #include <cassert>
 #include <cstdio>
-#include <iostream>
 #include <memory>
-#include <string>
 
 using namespace std;
 
 extern FILE *yyin;
-extern int yyparse(unique_ptr<std::string> &ast);
+extern int yyparse(unique_ptr<ast::BaseAST> &ast);
 
 int main(int argc, const char *argv[]) {
   // compiler mode input_file -o output_file
@@ -21,11 +20,11 @@ int main(int argc, const char *argv[]) {
   assert(yyin);
 
   // Call parser function, parser will use lexer to read the file
-  unique_ptr<string> ast;
+  unique_ptr<ast::BaseAST> ast;
   auto ret = yyparse(ast);
   assert(!ret);
 
   // Output the AST (which is a string)
-  cout << *ast << endl;
+  ast->Dump();
   return 0;
 }

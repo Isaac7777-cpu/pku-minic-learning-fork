@@ -53,3 +53,16 @@ vim.o.exrc = true
 vim.o.secure = true
 ```
 
+## Compiling
+
+Compiling using cmake:
+
+```sh
+docker exec -it minic-dev cmake --build build -j
+```
+
+Then, run the compiled program with,
+
+```sh
+docker exec -it minic-dev ./build/compiler -koopa example/hello.c -o hello.koopa
+```

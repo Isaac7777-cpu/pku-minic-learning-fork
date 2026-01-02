@@ -3,6 +3,8 @@ use std::env::args;
 use std::fs::read_to_string;
 use std::io::Result;
 
+mod ast;
+
 // Follow the name of the just created xxxx.lalrpop
 lalrpop_mod!(sysy);
 

@@ -1,6 +1,7 @@
 %code requires {
   #include <memory>
   #include <string>
+  #include "ast.hpp"
 }
 
 %{
@@ -8,73 +9,86 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include "ast.hpp"
 
 // Declare lexer function and error handling
 int yylex();
-void yyerror(std::unique_ptr<std::string> &ast, const char *s);
+void yyerror(std::unique_ptr<ast::BaseAST> &ast, const char *s);
 
 using namespace std;
 
 %}
 
-%parse-param { std::unique_ptr<std::string> &ast }
+%parse-param { std::unique_ptr<ast::BaseAST> &ast }
 
 %union {
   std::string *str_val;
   int int_val;
+  ast::BaseAST *ast_val;
 }
 
 %token INT RETURN
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
-%type <str_val> FuncDef FuncType Block Stmt Number
+%type <ast_val> FuncDef FuncType Block Stmt
+%type <int_val> Number
 
 %%
 
 CompUnit
   : FuncDef {
-    ast = unique_ptr<string>($1);
+    auto comp_unit = make_unique<ast::CompUnitAST>();
+    comp_unit->func_def = unique_ptr<ast::BaseAST>($1);
+    ast = std::move(comp_unit);
   }
   ;
 
 FuncDef
   : FuncType IDENT '(' ')' Block {
-    auto type = unique_ptr<string>($1);
-    auto ident = unique_ptr<string>($2);
-    auto block = unique_ptr<string>($5);
-    $$ = new string(*type + " " + *ident + "() " + *block);
+    auto ast_node = new ast::FuncDefAST();
+    ast_node->func_type = unique_ptr<ast::BaseAST>($1);
+    ast_node->ident = *unique_ptr<string>($2);
+    ast_node->block = unique_ptr<ast::BaseAST>($5);
+    $$ = ast_node;
   }
   ;
 
 FuncType
   : INT {
-    $$ = new string("int");
+    $$ = new ast::FuncTypeAST();
   }
   ;
 
 Block
   : '{' Stmt '}' {
-    auto stmt = unique_ptr<string>($2);
-    $$ = new string("{ " + *stmt + " }");
+    auto ast_node = new ast::BlockAST();
+    ast_node->stmt = unique_ptr<ast::BaseAST>($2);
+    $$ = ast_node;
   }
   ;
 
 Stmt
   : RETURN Number ';' {
-    auto number = unique_ptr<string>($2);
-    $$ = new string("return " + *number + ";");
+    auto ast_node = new ast::StmtAST();
+    
+    auto num = make_unique<ast::NumberAST>();
+    num->int_val = $2;
+
+    ast_node->number = std::move(num);
+
+    $$ = ast_node;
   }
   ;
 
 Number
   : INT_CONST {
-    $$ = new string(to_string($1));
+    $$ = $1;
   }
   ;
 
 %%
 
-void yyerror(unique_ptr<string> &ast, const char *s) {
+void yyerror(unique_ptr<ast::BaseAST> &ast, const char *s) {
   cerr << "error: " << s << endl;
 }
