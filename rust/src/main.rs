@@ -20,6 +20,6 @@ fn main() -> Result<()> {
 
     let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
 
-    println!("{}", ast);
+    println!("{:#?}", ast);
     Ok(())
 }
