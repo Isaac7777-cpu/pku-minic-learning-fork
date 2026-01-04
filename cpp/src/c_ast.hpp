@@ -2,9 +2,10 @@
 
 #include <iostream>
 #include <memory>
+#include <ostream>
 #include <string>
 
-namespace ast {
+namespace c_ast {
 
 class BaseAST {
 public:
@@ -77,4 +78,4 @@ public:
   void Dump() const override { std::cout << "Number { " << int_val << " }"; }
 };
 
-} // namespace ast
+} // namespace c_ast
