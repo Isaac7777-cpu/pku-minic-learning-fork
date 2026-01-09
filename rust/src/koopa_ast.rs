@@ -37,7 +37,6 @@ impl LowerCtx {
             .push_key_back(entry)
             .expect("We should only have one basic block for now.");
 
-        // TODO: Translate all the statement inside.
         self.cur_bb = Some(entry);
 
         self.lower_block(func, block);
