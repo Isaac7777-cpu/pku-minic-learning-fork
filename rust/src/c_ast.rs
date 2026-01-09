@@ -1,3 +1,5 @@
+use koopa::ir::Type;
+
 #[derive(Debug)]
 pub struct CompUnit {
     pub func_def: FuncDef,
@@ -13,6 +15,14 @@ pub struct FuncDef {
 #[derive(Debug)]
 pub enum FuncType {
     Int,
+}
+
+impl FuncType {
+    pub fn to_koopa_type(&self) -> Type {
+        match self {
+            Self::Int => Type::get_i32(),
+        }
+    }
 }
 
 #[derive(Debug)]

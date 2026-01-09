@@ -1,4 +1,4 @@
-use crate::ast::{Block, CompUnit, FuncDef, FuncType, Number, Stmt};
+use crate::c_ast::{Block, CompUnit, FuncDef, FuncType, Number, Stmt};
 
 grammar;
 
