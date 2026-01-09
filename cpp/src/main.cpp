@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cassert>
 #include <cstdio>
+#include <fstream>
+#include <iostream>
 #include <memory>
 
 // using namespace std;
@@ -21,6 +23,12 @@ int main(int argc, const char *argv[]) {
   yyin = fopen(input, "r");
   assert(yyin);
 
+  std::ofstream output_stream(output);
+  if (output_stream.is_open() == false) {
+    std::cerr << "Unable to write to output file: " << output << std::endl;
+    return 1;
+  }
+
   // Call parser function, parser will use lexer to read the file
   std::unique_ptr<c_ast::BaseAST> c_ast;
   auto ret = yyparse(c_ast);
@@ -33,11 +41,7 @@ int main(int argc, const char *argv[]) {
 
   // Translate to Koopa IR
   auto ret_in_koopa = convert_to_custom_koopa_from_c_reps(std::move(c_ast));
-
-  std::cout << "The Koopa IR: " << std::endl << std::endl;
-  std::cout << "```" << std::endl;
-  ret_in_koopa->Dump(std::cout);
-  std::cout << "```" << std::endl;
+  ret_in_koopa->Dump(output_stream);
 
   return 0;
 }

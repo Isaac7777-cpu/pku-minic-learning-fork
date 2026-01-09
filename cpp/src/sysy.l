@@ -13,6 +13,8 @@ using namespace std;
 
 %}
 
+%x C_COMMENT
+
 WhiteSpace    [ \t\n\r]*
 LineComment   "//".*
 
@@ -26,6 +28,11 @@ Hexadecimal   0[xX][0-9a-fA-F]+
 
 {WhiteSpace}  { /* Ignore without actions */ }
 {LineComment} { /* Ignore without actions */ }
+
+"/*"                  { BEGIN(C_COMMENT); }
+<C_COMMENT>"*/"       { BEGIN(INITIAL); }
+<C_COMMENT>.|\n       { /* Ignore comment content */ }
+<C_COMMENT><<EOF>>    { /* Unterminated comment */ return 0; }
 
 "int"         { return INT; }
 "return"      { return RETURN; }
