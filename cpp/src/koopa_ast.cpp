@@ -7,7 +7,7 @@
 #include <stdexcept>
 #include <string>
 
-static constexpr const std::string_view INDENT = "  ";
+static constexpr const std::string_view INDENT = "\t";
 
 namespace koopa_ast {
 
