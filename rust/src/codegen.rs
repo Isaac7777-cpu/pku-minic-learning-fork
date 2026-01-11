@@ -11,9 +11,11 @@ pub struct CodeGenCtx<'a, W: Write> {
     pub cur_func: Option<koopa::ir::Function>,
 }
 
-fn get_func_data<'a, 'b, W: Write>(ctx: &'b CodeGenCtx<'a, W>) -> &'a koopa::ir::FunctionData {
-    ctx.prog
-        .func(ctx.cur_func.expect("No current function set."))
+impl<'a, W: Write> CodeGenCtx<'a, W> {
+    pub fn func(&self) -> &'a koopa::ir::FunctionData {
+        self.prog
+            .func(self.cur_func.expect("No current function set."))
+    }
 }
 
 pub trait GenerateAsm {
@@ -49,13 +51,8 @@ impl GenerateAsm for koopa::ir::FunctionData {
 
 impl GenerateAsm for koopa::ir::layout::BasicBlockNode {
     fn generate<W: Write>(&self, ctx: &mut CodeGenCtx<'_, W>) {
-        // let prog = ctx.prog;
-        // let cur = ctx.cur_func.expect("no current function");
-        //
-        // let func = prog.func(cur);
-
         for (&val, _inst_node) in self.insts() {
-            let val_data = get_func_data(ctx).dfg().value(val);
+            let val_data = ctx.func().dfg().value(val);
             val_data.generate(ctx);
         }
     }
@@ -69,7 +66,7 @@ impl GenerateAsm for koopa::ir::entities::ValueData {
             }
             ValueKind::Return(ret) => {
                 if let Some(ret_exp_val) = ret.value() {
-                    get_func_data(ctx).dfg().value(ret_exp_val).generate(ctx);
+                    ctx.func().dfg().value(ret_exp_val).generate(ctx);
                 }
                 writeln!(ctx.out, "{}ret", INDENT).expect(WRITE_UNABLE_ERROR);
             }
