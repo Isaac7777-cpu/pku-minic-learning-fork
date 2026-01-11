@@ -1,13 +1,15 @@
+mod c_ast;
+mod codegen;
+mod koopa_ast;
+
 use koopa::back::KoopaGenerator;
 use lalrpop_util::lalrpop_mod;
 use std::env::args;
 use std::fs::{File, read_to_string};
 use std::io::{BufWriter, Result, Write};
 
+use crate::codegen::GenerateAsm;
 use crate::koopa_ast::LowerCtx;
-
-mod c_ast;
-mod koopa_ast;
 
 // Follow the name of the just created xxxx.lalrpop
 lalrpop_mod!(sysy);
@@ -33,10 +35,20 @@ fn main() -> Result<()> {
         .expect(format!("Unable to write to output file: {}", output).as_str());
     let mut writer = BufWriter::new(file);
 
-    let mut generator = KoopaGenerator::new(&mut writer);
-    generator
-        .generate_on(&lower_ctx.program)
-        .expect("Unable to generate koopa IR from custom koopa representation.");
+    if mode == "-koopa" {
+        let mut generator = KoopaGenerator::new(&mut writer);
+        generator
+            .generate_on(&lower_ctx.program)
+            .expect("Unable to generate koopa IR from custom koopa representation.");
+    }
+
+    if mode == "-riscv" {
+        lower_ctx.program.generate(&mut codegen::CodeGenCtx {
+            out: &mut writer,
+            prog: &lower_ctx.program,
+            cur_func: None,
+        });
+    }
 
     writer
         .flush()
