@@ -84,19 +84,20 @@ translate_number_c_ast(const c_ast::NumberAST &number) {
 /**
  * Going from StmtAST to koopa stmt
  *
- * TODO: Currently, StmtAST is only the return value.
  */
 std::unique_ptr<koopa_ast::Return>
 translate_stmt_c_ast(const c_ast::StmtAST &stmt) {
   auto ret = std::make_unique<koopa_ast::Return>();
 
-  auto *num = dynamic_cast<const c_ast::NumberAST *>(stmt.number.get());
-  if (!num) {
-    throw std::runtime_error("StmtAST expects NumberAST");
-  }
-
-  ret->return_val = translate_number_c_ast(*num);
-  return ret;
+  // TODO: Fix the error by changing it to unary expression.
+  // auto *num = dynamic_cast<const c_ast::NumberAST *>(stmt.number.get());
+  // if (!num) {
+  //   throw std::runtime_error("StmtAST expects NumberAST");
+  // }
+  //
+  // ret->return_val = translate_number_c_ast(*num);
+  // return ret;
+  return nullptr;
 }
 
 /**

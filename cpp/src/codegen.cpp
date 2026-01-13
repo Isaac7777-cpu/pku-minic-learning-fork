@@ -5,7 +5,9 @@
 
 static constexpr const std::string_view INDENT = "\t";
 
-void CodeGenUnit::generate(const koopa_raw_program_t &program) { Visit(program); }
+void CodeGenUnit::generate(const koopa_raw_program_t &program) {
+  Visit(program);
+}
 
 void CodeGenUnit::Visit(const koopa_raw_program_t &program) {
   Visit(program.values);
