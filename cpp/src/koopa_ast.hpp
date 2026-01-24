@@ -1,9 +1,8 @@
 #pragma once
 
-#include "c_ast.hpp"
-
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <vector>
@@ -35,42 +34,83 @@ private:
   TypeKind type;
 };
 
-enum class ValueKind {
-  Integer,
-  Return,
+enum class ValueKind { Integer, Return, Binary };
+enum class BinaryOp {
+  NotEq,
+  Eq,
+  Gt,
+  Lt,
+  Ge,
+  Le,
+  Add,
+  Sub,
+  Mul,
+  Div,
+  Mod,
+  And,
+  Or,
+  Xor,
+  Shl,
+  Sar
 };
 
 class Value : public Base {
 public:
+  std::optional<std::string> name;
   virtual ValueKind kind() const = 0;
-};
-
-class Return final : public Value {
-public:
-  ValueKind kind() const override { return ValueKind::Return; }
-  std::unique_ptr<Value> return_val;
-
-  void Dump(std::ostream &out) const override;
+  virtual std::string get_reprs() = 0;
 };
 
 class Integer final : public Value {
+private:
+  std::int32_t val_;
 
 public:
   Integer(std::int32_t val) : val_(val) {}
   ValueKind kind() const override { return ValueKind::Integer; }
-
   void Dump(std::ostream &out) const override;
+  std::string get_reprs() override;
+};
 
+class Return final : public Value {
 private:
-  std::int32_t val_;
+  Value *return_val;
+
+public:
+  ValueKind kind() const override { return ValueKind::Return; }
+  void Dump(std::ostream &out) const override;
+  std::string get_reprs() override;
+};
+
+class Binary final : public Value {
+private:
+  const Value *lhs;
+  const Value *rhs;
+  BinaryOp op;
+
+public:
+  ValueKind kind() const override { return ValueKind::Binary; }
+  void Dump(std::ostream &out) const override;
+  std::string get_reprs() override;
 };
 
 class BasicBlock : public Base {
 public:
-  std::vector<std::unique_ptr<Value>> values;
+  std::vector<std::unique_ptr<Value>> pool;
+  std::vector<Value *> insts;
 
   BasicBlock(std::string name_) : name(name_) {}
   BasicBlock() : name("") {}
+
+  // helper: allocates in pool, optionally also appends to insts
+  template <class T, class... Args> T *Make(bool is_inst, Args &&...args) {
+    pool.push_back(std::make_unique<T>(std::forward<Args>(args)...));
+    auto *p = static_cast<T *>(pool.back().get());
+    if (is_inst)
+      insts.push_back(p);
+    return p;
+  }
+
   void Dump(std::ostream &out) const override;
 
 private:
@@ -94,6 +134,3 @@ public:
   void Dump(std::ostream &out) const override;
 };
 } // namespace koopa_ast
-
-std::unique_ptr<koopa_ast::Program>
-convert_to_custom_koopa_from_c_reps(std::unique_ptr<c_ast::BaseAST> ast);
