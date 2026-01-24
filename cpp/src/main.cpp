@@ -1,5 +1,6 @@
 #include "c_ast.hpp"
 #include "codegen.hpp"
+#include "ir_builder.hpp"
 #include "koopa.h"
 #include "koopa_ast.hpp"
 #include <cassert>

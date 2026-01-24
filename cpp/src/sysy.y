@@ -143,6 +143,9 @@ UnaryOp
   | '!' {
     $$ = c_ast::UnaryOp::BANG;
   }
+  | '~' {
+    $$ = c_ast::UnaryOp::TILDE;
+  }
 
 %%
 

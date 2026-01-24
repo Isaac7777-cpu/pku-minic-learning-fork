@@ -9,7 +9,7 @@ private:
   int var_count;
 
 public:
-  std::string get_var_name();
+  std::string get_new_var_name();
 };
 
 } // namespace koopa_ast

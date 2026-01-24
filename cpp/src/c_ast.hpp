@@ -2,12 +2,10 @@
 
 #include <iostream>
 #include <memory>
-#include <ostream>
-#include <string>
 
 namespace c_ast {
 
-enum class UnaryOp { PLUS, MINUS, BANG };
+enum class UnaryOp { PLUS, MINUS, BANG, TILDE };
 
 inline const char *ToString(UnaryOp op) {
   switch (op) {
@@ -17,6 +15,8 @@ inline const char *ToString(UnaryOp op) {
     return "-";
   case UnaryOp::BANG:
     return "!";
+  case UnaryOp::TILDE:
+    return "~";
   }
 }
 

@@ -1,9 +1,9 @@
 #pragma once
 
+#include "koopa.h"
 #include <cstdint>
 #include <memory>
 #include <optional>
-#include <ostream>
 #include <string>
 #include <vector>
 
@@ -18,7 +18,7 @@ class Base {
 public:
   virtual ~Base() = default;
 
-  virtual void Dump(std::ostream &out) const = 0;
+  virtual void Dump(std::ostream &out) = 0;
 };
 
 class Type : public Base {
@@ -28,7 +28,7 @@ public:
   static Type I32() { return {TypeKind::I32}; }
   static Type Unit() { return {TypeKind::Unit}; }
 
-  void Dump(std::ostream &out) const override;
+  void Dump(std::ostream &out) override;
 
 private:
   TypeKind type;
@@ -51,8 +51,11 @@ enum class BinaryOp {
   Or,
   Xor,
   Shl,
+  Shr,
   Sar
 };
+
+std::string get_binary_op_repr(const BinaryOp &);
 
 class Value : public Base {
 public:
@@ -68,7 +71,7 @@ private:
 public:
   Integer(std::int32_t val) : val_(val) {}
   ValueKind kind() const override { return ValueKind::Integer; }
-  void Dump(std::ostream &out) const override;
+  void Dump(std::ostream &out) override;
   std::string get_reprs() override;
 };
 
@@ -77,20 +80,23 @@ private:
   Value *return_val;
 
 public:
+  Return(Value *ret_val_) : return_val(ret_val_) {}
   ValueKind kind() const override { return ValueKind::Return; }
-  void Dump(std::ostream &out) const override;
+  void Dump(std::ostream &out) override;
   std::string get_reprs() override;
 };
 
 class Binary final : public Value {
 private:
-  const Value *lhs;
-  const Value *rhs;
+  Value *lhs;
+  Value *rhs;
   BinaryOp op;
 
 public:
+  Binary(BinaryOp op_, Value *lhs_, Value *rhs_)
+      : lhs(lhs_), rhs(rhs_), op(op_) {}
   ValueKind kind() const override { return ValueKind::Binary; }
-  void Dump(std::ostream &out) const override;
+  void Dump(std::ostream &out) override;
   std::string get_reprs() override;
 };
 
@@ -102,7 +108,7 @@ public:
   BasicBlock(std::string name_) : name(name_) {}
   BasicBlock() : name("") {}
 
-  // helper: allocates in pool, optionally also appends to insts
+  // allocates in pool, optionally also appends to insts
   template <class T, class... Args> T *Make(bool is_inst, Args &&...args) {
     pool.push_back(std::make_unique<T>(std::forward<Args>(args)...));
     auto *p = static_cast<T *>(pool.back().get());
@@ -111,7 +117,7 @@ public:
     return p;
   }
 
-  void Dump(std::ostream &out) const override;
+  void Dump(std::ostream &out) override;
 
 private:
   std::string name;
@@ -123,7 +129,7 @@ public:
   std::unique_ptr<Type> type;
   std::vector<std::unique_ptr<BasicBlock>> basicblocks;
 
-  void Dump(std::ostream &out) const override;
+  void Dump(std::ostream &out) override;
 };
 
 class Program : public Base {
@@ -131,6 +137,6 @@ public:
   std::vector<std::unique_ptr<Value>> global_values;
   std::vector<std::unique_ptr<Function>> functions;
 
-  void Dump(std::ostream &out) const override;
+  void Dump(std::ostream &out) override;
 };
 } // namespace koopa_ast
