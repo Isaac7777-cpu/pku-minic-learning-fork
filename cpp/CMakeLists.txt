@@ -61,3 +61,7 @@ set(SOURCES ${C_SOURCES} ${CXX_SOURCES} ${CC_SOURCES}
 add_executable(compiler ${SOURCES})
 set_target_properties(compiler PROPERTIES C_STANDARD 11 CXX_STANDARD 17)
 target_link_libraries(compiler koopa pthread dl)
+
+# Enable DEBUG LOG if build is debug
+# For a release build, add this flat: `-DCMAKE_BUILD_TYPE=Release`
+target_compile_definitions(compiler PRIVATE $<$<CONFIG:Debug>:DEBUG>)

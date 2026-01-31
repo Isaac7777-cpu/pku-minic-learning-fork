@@ -93,7 +93,7 @@ void Return::Dump(std::ostream &out) {
 
 void Binary::Dump(std::ostream &out) {
   out << INDENT << this->get_reprs() << " = " << get_binary_op_repr(this->op)
-      << " " << this->lhs->get_reprs() << " " << this->rhs->get_reprs()
+      << " " << this->lhs->get_reprs() << ", " << this->rhs->get_reprs()
       << std::endl;
 }
 

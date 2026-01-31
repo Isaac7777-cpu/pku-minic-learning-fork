@@ -88,9 +88,7 @@ int main(int argc, const char *argv[]) {
   if (compile_mode == COMPILE_MODE::RISC_V) {
     CodeGenUnit gen(output_stream);
     gen.generate(koopa_raw_program);
+    koopa_delete_raw_program_builder(koopa_raw_builder);
+    return 0;
   }
-
-  koopa_delete_raw_program_builder(koopa_raw_builder);
-
-  return 0;
 }
