@@ -1,4 +1,4 @@
-use crate::c_ast::{Block, CompUnit, FuncDef, FuncType, Number, Stmt};
+use crate::c_ast::{Block, CompUnit, FuncDef, FuncType, Stmt, Exp, PrimaryExp, Number, UnaryExp, UnaryOp};
 
 grammar;
 
@@ -25,9 +25,21 @@ FuncType: FuncType = "int" => FuncType::Int;
 
 Block: Block = "{" <stmt: Stmt> "}" => Block { <> };
 
-Stmt: Stmt = "return" <num: Number> ";" => Stmt { <> };
+Stmt: Stmt = "return" <exp: Exp> ";" => Stmt { <> };
+
+Exp: Exp = <unary_exp: UnaryExp> => Exp { unary_exp: Box::new(unary_exp) };
+
+PrimaryExp: PrimaryExp = {
+  "(" <exp: Exp> ")" => PrimaryExp::ExpPrimary { exp: Box::new(exp) },
+  <num: Number> => PrimaryExp::NumberPrimary { <> },
+};
 
 Number: i32 = <num: IntConst> => <>;
+
+UnaryExp: UnaryExp = {
+  <primary_exp: PrimaryExp> => UnaryExp::PrimaryUnary{ primary_exp: Box::new(primary_exp) },
+  <op: UnaryOp> <e: UnaryExp> => UnaryExp::OpUnaryUnary{ unary_op: op, unary_exp: Box::new(e) }
+};
 
 // If you match identifer, return the string
 // <> represents the result matched by the regex
@@ -38,4 +50,10 @@ IntConst: i32 = {
   r"[1-9][0-9]*" => i32::from_str_radix(<>, 10).unwrap(),
   r"0[0-7]*" => i32::from_str_radix(<>, 8).unwrap(),
   r"0[xX][0-9a-fA-F]+" => i32::from_str_radix(&<>[2..], 16).unwrap(),
+}
+
+UnaryOp: UnaryOp = {
+  "+" => UnaryOp::PLUS,
+  "-" => UnaryOp::MINUS,
+  "!" => UnaryOp::BANG,
 }

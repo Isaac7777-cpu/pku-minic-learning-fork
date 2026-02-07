@@ -49,7 +49,7 @@ impl LowerCtx {
     }
 
     pub fn lower_stmt(&mut self, func: Function, stmt: &Stmt) {
-        self.emit_return_inst(func, stmt.num);
+        // self.emit_return_inst(func, stmt.num);
     }
 
     fn emit_return_inst(&mut self, func: Function, num: i32) {

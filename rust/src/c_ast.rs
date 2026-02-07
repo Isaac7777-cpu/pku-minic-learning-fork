@@ -32,7 +32,36 @@ pub struct Block {
 
 #[derive(Debug)]
 pub struct Stmt {
-    pub num: Number,
+    pub exp: Exp,
+}
+
+#[derive(Debug)]
+pub struct Exp {
+    pub unary_exp: Box<UnaryExp>,
+}
+
+#[derive(Debug)]
+pub enum PrimaryExp {
+    ExpPrimary { exp: Box<Exp> },
+    NumberPrimary { num: Number },
 }
 
 pub type Number = i32;
+
+#[derive(Debug)]
+pub enum UnaryExp {
+    PrimaryUnary {
+        primary_exp: Box<PrimaryExp>,
+    },
+    OpUnaryUnary {
+        unary_op: UnaryOp,
+        unary_exp: Box<UnaryExp>,
+    },
+}
+
+#[derive(Debug)]
+pub enum UnaryOp {
+    PLUS,
+    MINUS,
+    BANG,
+}
