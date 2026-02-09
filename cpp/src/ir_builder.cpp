@@ -122,7 +122,7 @@ koopa_ast::Value *translate_unary_exp_c_ast(const c_ast::UnaryExpAST &unary,
 koopa_ast::Value *translate_exp_c_ast(const c_ast::ExpAST &exp,
                                       koopa_ast::BasicBlock &block) {
   auto *unary_exp =
-      dynamic_cast<const c_ast::UnaryExpAST *>(exp.unary_exp.get());
+      dynamic_cast<const c_ast::UnaryExpAST *>(exp.add_exp.get());
   if (!unary_exp)
     throw std::runtime_error(
         "ir_builder error: ExpAST expects UnaryExpAST at param `unary_exp`");

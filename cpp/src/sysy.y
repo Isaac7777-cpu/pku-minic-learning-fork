@@ -24,7 +24,9 @@ using namespace std;
 %union {
   std::string *str_val;
   int int_val;
-  c_ast::UnaryOp op_val;
+  c_ast::UnaryOp unary_op_val;
+  c_ast::MulOp mul_op_val;
+  c_ast::AddOp add_op_val;
   c_ast::BaseAST *ast_val;
 }
 
@@ -32,9 +34,11 @@ using namespace std;
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
-%type <ast_val> FuncDef FuncType Block Stmt Exp PrimaryExp UnaryExp
+%type <ast_val> FuncDef FuncType Block Stmt Exp PrimaryExp UnaryExp MulExp AddExp
 %type <int_val> Number
-%type <op_val> UnaryOp
+%type <unary_op_val> UnaryOp
+%type <mul_op_val> MulOp
+%type <add_op_val> AddOp
 
 %destructor { delete $$; } <ast_val>
 %destructor { delete $$; } <str_val>
@@ -84,10 +88,10 @@ Stmt
   ;
 
 Exp
-  : UnaryExp {
+  : AddExp {
     auto ast_node = new c_ast::ExpAST();
 
-    ast_node->unary_exp = std::unique_ptr<c_ast::BaseAST>($1);
+    ast_node->add_exp = std::unique_ptr<c_ast::BaseAST>($1);
 
     $$ = ast_node;
   }
@@ -133,6 +137,42 @@ UnaryExp
     $$ = ast_node;
   }
 
+MulExp
+  : UnaryExp {
+    auto ast_node = new c_ast::MulExpASTUnary();
+
+    ast_node->unary_exp = std::unique_ptr<c_ast::BaseAST>($1);
+
+    $$ = ast_node;
+  }
+  | MulExp MulOp UnaryExp {
+    auto ast_node = new c_ast::MulExpASTMulUnary();
+
+    ast_node->mul_op = $2;
+    ast_node->mul_exp = std::unique_ptr<c_ast::BaseAST>($1);
+    ast_node->unary_exp = std::unique_ptr<c_ast::BaseAST>($3);
+
+    $$ = ast_node;
+  }
+
+AddExp
+  : MulExp {
+    auto ast_node = new c_ast::AddExpASTMul();
+
+    ast_node->mul_exp = std::unique_ptr<c_ast::BaseAST>($1);
+
+    $$ = ast_node;
+  }
+  | AddExp AddOp MulExp {
+    auto ast_node = new c_ast::AddExpASTAddMul();
+
+    ast_node->add_op = $2;
+    ast_node->add_exp = std::unique_ptr<c_ast::BaseAST>($1);
+    ast_node->mul_exp = std::unique_ptr<c_ast::BaseAST>($3);
+
+    $$ = ast_node;
+  }
+
 UnaryOp
   : '+' {
     $$ = c_ast::UnaryOp::PLUS;
@@ -146,6 +186,26 @@ UnaryOp
   | '~' {
     $$ = c_ast::UnaryOp::TILDE;
   }
+
+MulOp
+  : '*' {
+    $$ = c_ast::MulOp::STAR;
+  }
+  | '/' {
+    $$ = c_ast::MulOp::SLASH;
+  }
+  | '%' {
+    $$ = c_ast::MulOp::PERCENT;
+  }
+
+AddOp
+  : '+' {
+    $$ = c_ast::AddOp::PLUS;
+  }
+  | '-' {
+    $$ = c_ast::AddOp::MINUS;
+  }
+
 
 %%
 

@@ -6,6 +6,8 @@
 namespace c_ast {
 
 enum class UnaryOp { PLUS, MINUS, BANG, TILDE };
+enum class MulOp { STAR, SLASH, PERCENT };
+enum class AddOp { PLUS, MINUS };
 
 inline const char *ToString(UnaryOp op) {
   switch (op) {
@@ -17,6 +19,26 @@ inline const char *ToString(UnaryOp op) {
     return "!";
   case UnaryOp::TILDE:
     return "~";
+  }
+}
+
+inline const char *ToString(MulOp op) {
+  switch (op) {
+  case MulOp::STAR:
+    return "*";
+  case MulOp::SLASH:
+    return "/";
+  case MulOp::PERCENT:
+    return "%";
+  }
+}
+
+inline const char *ToString(AddOp op) {
+  switch (op) {
+  case AddOp::PLUS:
+    return "+";
+  case AddOp::MINUS:
+    return "-";
   }
 }
 
@@ -86,11 +108,11 @@ public:
 
 class ExpAST final : public BaseAST {
 public:
-  std::unique_ptr<BaseAST> unary_exp;
+  std::unique_ptr<BaseAST> add_exp;
 
   void Dump() const override {
     std::cout << "ExpAST { ";
-    unary_exp->Dump();
+    add_exp->Dump();
     std::cout << " }";
   }
 };
@@ -154,6 +176,68 @@ public:
     std::cout << "UnaryExpAST { " << ToString(unary_op) << "( ";
     unary_exp->Dump();
     std::cout << " ) }";
+  }
+};
+
+class MulExpAST : public BaseAST {
+public:
+  virtual ~MulExpAST() = default;
+};
+
+class MulExpASTUnary final : public MulExpAST {
+public:
+  std::unique_ptr<BaseAST> unary_exp;
+
+  void Dump() const override {
+    std::cout << "MulExpAST { ";
+    unary_exp->Dump();
+    std::cout << " }";
+  }
+};
+
+class MulExpASTMulUnary final : public BaseAST {
+public:
+  MulOp mul_op;
+  std::unique_ptr<BaseAST> mul_exp;
+  std::unique_ptr<BaseAST> unary_exp;
+
+  void Dump() const override {
+    std::cout << "MulExpAST { " << ToString(mul_op) << "( ";
+    mul_exp->Dump();
+    std::cout << " , ";
+    unary_exp->Dump();
+    std::cout << " ) }";
+  }
+};
+
+class AddExpAST : public BaseAST {
+public:
+  virtual ~AddExpAST() = default;
+};
+
+class AddExpASTMul final : public BaseAST {
+public:
+  std::unique_ptr<BaseAST> mul_exp;
+
+  void Dump() const override {
+    std::cout << "AddExpAST { ";
+    mul_exp->Dump();
+    std::cout << " }";
+  }
+};
+
+class AddExpASTAddMul final : public BaseAST {
+public:
+  AddOp add_op;
+  std::unique_ptr<BaseAST> add_exp;
+  std::unique_ptr<BaseAST> mul_exp;
+
+  void Dump() const override {
+    std::cout << "AddExpAST { " << ToString(add_op) << "( ";
+    add_exp->Dump();
+    std::cout << " , ";
+    mul_exp->Dump();
+    std::cout << " }";
   }
 };
 
