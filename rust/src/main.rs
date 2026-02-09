@@ -1,15 +1,11 @@
-mod c_ast;
-mod codegen;
-mod koopa_ast;
-
 use koopa::back::KoopaGenerator;
 use lalrpop_util::lalrpop_mod;
 use std::env::args;
 use std::fs::{File, read_to_string};
 use std::io::{BufWriter, Result, Write};
 
-use crate::codegen::GenerateAsm;
-use crate::koopa_ast::LowerCtx;
+use sysy_il::codegen::{CodeGenCtx, GenerateAsm};
+use sysy_il::ir_builder::LowerCtx;
 
 // Follow the name of the just created xxxx.lalrpop
 lalrpop_mod!(sysy);
@@ -26,7 +22,7 @@ fn main() -> Result<()> {
 
     let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
 
-    println!("{:#?}", ast);
+    // println!("{:#?}", ast);
 
     let mut lower_ctx = LowerCtx::new();
     lower_ctx.build_program_from_comp_unit(ast);
@@ -43,11 +39,9 @@ fn main() -> Result<()> {
     }
 
     if mode == "-riscv" {
-        lower_ctx.program.generate(&mut codegen::CodeGenCtx {
-            out: &mut writer,
-            prog: &lower_ctx.program,
-            cur_func: None,
-        });
+        lower_ctx
+            .program
+            .generate(&mut CodeGenCtx::new(&mut writer, &lower_ctx.program))
     }
 
     writer

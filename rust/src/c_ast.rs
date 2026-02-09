@@ -64,4 +64,5 @@ pub enum UnaryOp {
     PLUS,
     MINUS,
     BANG,
+    TILDE,
 }

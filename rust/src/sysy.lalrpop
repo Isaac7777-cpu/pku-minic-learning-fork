@@ -1,4 +1,4 @@
-use crate::c_ast::{Block, CompUnit, FuncDef, FuncType, Stmt, Exp, PrimaryExp, Number, UnaryExp, UnaryOp};
+use sysy_il::c_ast::{Block, CompUnit, FuncDef, FuncType, Stmt, Exp, PrimaryExp, Number, UnaryExp, UnaryOp};
 
 grammar;
 
@@ -34,7 +34,7 @@ PrimaryExp: PrimaryExp = {
   <num: Number> => PrimaryExp::NumberPrimary { <> },
 };
 
-Number: i32 = <num: IntConst> => <>;
+Number: Number = <num: IntConst> => <>;
 
 UnaryExp: UnaryExp = {
   <primary_exp: PrimaryExp> => UnaryExp::PrimaryUnary{ primary_exp: Box::new(primary_exp) },
@@ -56,4 +56,5 @@ UnaryOp: UnaryOp = {
   "+" => UnaryOp::PLUS,
   "-" => UnaryOp::MINUS,
   "!" => UnaryOp::BANG,
+  "~" => UnaryOp::TILDE,
 }
