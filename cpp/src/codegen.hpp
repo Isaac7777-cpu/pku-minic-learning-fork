@@ -2,6 +2,7 @@
 
 #include "codegen_ctx.hpp"
 #include "koopa.h"
+#include "reg.hpp"
 #include <iostream>
 #include <memory>
 
@@ -11,10 +12,10 @@ private:
   virtual void Visit(const koopa_raw_slice_t &) = 0;
   virtual void Visit(const koopa_raw_function_t &) = 0;
   virtual void Visit(const koopa_raw_basic_block_t &) = 0;
-  virtual reg_t Visit(const koopa_raw_value_t &) = 0;
-  virtual reg_t Visit(const koopa_raw_return_t &) = 0;
-  virtual reg_t Visit(const koopa_raw_integer_t &) = 0;
-  virtual reg_t Visit(const koopa_raw_binary_t &) = 0;
+  virtual rv::Reg Visit(const koopa_raw_value_t &) = 0;
+  virtual rv::Reg Visit(const koopa_raw_return_t &) = 0;
+  virtual rv::Reg Visit(const koopa_raw_integer_t &) = 0;
+  virtual rv::Reg Visit(const koopa_raw_binary_t &) = 0;
 
 public:
   virtual ~IKoopaVisitor() = default;
@@ -31,10 +32,10 @@ private:
   void Visit(const koopa_raw_slice_t &) override;
   void Visit(const koopa_raw_function_t &) override;
   void Visit(const koopa_raw_basic_block_t &) override;
-  reg_t Visit(const koopa_raw_value_t &) override;
-  reg_t Visit(const koopa_raw_return_t &) override;
-  reg_t Visit(const koopa_raw_integer_t &) override;
-  reg_t Visit(const koopa_raw_binary_t &) override;
+  rv::Reg Visit(const koopa_raw_value_t &) override;
+  rv::Reg Visit(const koopa_raw_return_t &) override;
+  rv::Reg Visit(const koopa_raw_integer_t &) override;
+  rv::Reg Visit(const koopa_raw_binary_t &) override;
 
 public:
   CodeGenUnit(std::ostream &_dest) : output(_dest) {

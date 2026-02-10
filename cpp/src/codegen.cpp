@@ -1,6 +1,7 @@
 #include "codegen.hpp"
 #include "koopa.h"
 #include "logger.hpp"
+#include "reg.hpp"
 
 #include <cassert>
 #include <string_view>
@@ -143,6 +144,12 @@ reg_t CodeGenUnit::Visit(const koopa_raw_binary_t &binary) {
     return dst;
     break;
   }
+  case KOOPA_RBO_ADD: {
+    this->output << INDENT << "add   " << dst.to_string() << ", "
+                 << l_reg.to_string() << ", " << r_reg.to_string() << std::endl;
+    return dst;
+    break;
+  }
   case KOOPA_RBO_SUB: {
     std::optional<reg_t> dst_req = this->ctx->get_avail();
     if (dst_req) {
@@ -163,6 +170,12 @@ reg_t CodeGenUnit::Visit(const koopa_raw_binary_t &binary) {
       reallocate_register();
     }
     this->output << INDENT << "xor   " << dst.to_string() << ", "
+                 << l_reg.to_string() << ", " << r_reg.to_string() << std::endl;
+    return dst;
+    break;
+  }
+  case KOOPA_RBO_MUL: {
+    this->output << INDENT << "mul   " << dst.to_string() << ", "
                  << l_reg.to_string() << ", " << r_reg.to_string() << std::endl;
     return dst;
     break;
