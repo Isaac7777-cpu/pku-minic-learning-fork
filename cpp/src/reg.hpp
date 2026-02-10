@@ -37,8 +37,8 @@ public:
   unsigned int idx() const;
   char series() const;
 
-  friend bool operator==(const Reg& lhs, const Reg& rhs);
-  friend bool operator!=(const Reg& lhs, const Reg& rhs);
+  friend bool operator==(const Reg &lhs, const Reg &rhs);
+  friend bool operator!=(const Reg &lhs, const Reg &rhs);
 
 private:
   Impl v_;
