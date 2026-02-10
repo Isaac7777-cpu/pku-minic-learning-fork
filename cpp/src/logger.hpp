@@ -1,3 +1,5 @@
+#pragma once
+
 #include <chrono>
 #include <cxxabi.h>
 #include <iostream>
@@ -42,10 +44,7 @@ inline void LogFunction(const std::string &level, const std::string &file,
   throw std::runtime_error(ss.str());
 }
 
-#define LOG_ERROR(msg)                                                         \
-  do {                                                                         \
-    log_error_impl(__FILE__, __LINE__, (msg));                                 \
-  } while (0)
+#define LOG_ERROR(msg) log_error_impl(__FILE__, __LINE__, (msg));
 
 // A helper function to demangle the type name
 std::string demangle(const char *);
