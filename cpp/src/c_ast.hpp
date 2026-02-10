@@ -195,7 +195,7 @@ public:
   }
 };
 
-class MulExpASTMulUnary final : public BaseAST {
+class MulExpASTMulUnary final : public MulExpAST {
 public:
   MulOp mul_op;
   std::unique_ptr<BaseAST> mul_exp;
@@ -215,7 +215,7 @@ public:
   virtual ~AddExpAST() = default;
 };
 
-class AddExpASTMul final : public BaseAST {
+class AddExpASTMul final : public AddExpAST {
 public:
   std::unique_ptr<BaseAST> mul_exp;
 
@@ -226,7 +226,7 @@ public:
   }
 };
 
-class AddExpASTAddMul final : public BaseAST {
+class AddExpASTAddMul final : public AddExpAST {
 public:
   AddOp add_op;
   std::unique_ptr<BaseAST> add_exp;
