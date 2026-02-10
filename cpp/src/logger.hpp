@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cxxabi.h>
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
@@ -34,14 +35,17 @@ inline void LogFunction(const std::string &level, const std::string &file,
 #define LOG_INFO(msg) ((void)0)
 #endif
 
-[[noreturn]] inline void log_error_impl(
-    const char* file, int line, const std::string& msg
-) {
+[[noreturn]] inline void log_error_impl(const char *file, int line,
+                                        const std::string &msg) {
   std::stringstream ss;
-  ss << GetTimestamp()
-     << " [ERROR] " << file << ":" << line << " " << msg;
+  ss << GetTimestamp() << " [ERROR] " << file << ":" << line << " " << msg;
   throw std::runtime_error(ss.str());
 }
 
-#define LOG_ERROR(msg) \
-  do { log_error_impl(__FILE__, __LINE__, (msg)); } while (0)
+#define LOG_ERROR(msg)                                                         \
+  do {                                                                         \
+    log_error_impl(__FILE__, __LINE__, (msg));                                 \
+  } while (0)
+
+// A helper function to demangle the type name
+std::string demangle(const char *);
