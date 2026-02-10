@@ -7,10 +7,10 @@
 #include <string_view>
 
 static constexpr const std::string_view INDENT = "\t";
-static constexpr const reg_t RETURN_REGISTER = reg_t{'a', 0};
-static constexpr const reg_t ZERO_REGISTER = reg_t{'x', 0};
+static const rv::Reg RETURN_REGISTER = rv::Reg(rv::A{0});
+static const rv::Reg ZERO_REGISTER = rv::Reg(rv::Zero{});
 
-reg_t reallocate_register() {
+[[noreturn]] rv::Reg reallocate_register() {
   LOG_ERROR("Insufficient registers (currently have no way to resolve.)");
 }
 
@@ -62,7 +62,7 @@ void CodeGenUnit::Visit(const koopa_raw_basic_block_t &basic_block) {
   indent_level--;
 }
 
-reg_t CodeGenUnit::Visit(const koopa_raw_value_t &value) {
+rv::Reg CodeGenUnit::Visit(const koopa_raw_value_t &value) {
   // Check if we have seen the instruction before, avoid duplication
   auto it = this->ctx->reg_dict.find(value);
   if (it != this->ctx->reg_dict.end()) {
@@ -70,42 +70,41 @@ reg_t CodeGenUnit::Visit(const koopa_raw_value_t &value) {
   }
 
   const auto &kind = value->kind;
-  reg_t dst;
-  switch (kind.tag) {
-  case KOOPA_RVT_RETURN:
-    dst = Visit(kind.data.ret);
-    break;
-  case KOOPA_RVT_INTEGER:
-    dst = Visit(kind.data.integer);
-    break;
-  case KOOPA_RVT_BINARY:
-    dst = Visit(kind.data.binary);
-    break;
-  default:
-    LOG_ERROR("Unexpected koopa instruction type.");
-  }
+  rv::Reg dst = [&] {
+    switch (kind.tag) {
+    case KOOPA_RVT_RETURN:
+      return Visit(kind.data.ret);
+    case KOOPA_RVT_INTEGER:
+      return Visit(kind.data.integer);
+    case KOOPA_RVT_BINARY:
+      return Visit(kind.data.binary);
+    default:
+      LOG_ERROR("Unexpected koopa instruction type.");
+    }
+  }();
 
   // Remember the variable name
-  this->ctx->reg_dict[value] = dst;
+  this->ctx->reg_dict.insert_or_assign(value, dst);
   return dst;
 }
 
-reg_t CodeGenUnit::Visit(const koopa_raw_return_t &ret) {
-  reg_t dst = Visit(ret.value);
+rv::Reg CodeGenUnit::Visit(const koopa_raw_return_t &ret) {
+  rv::Reg dst = Visit(ret.value);
   if (dst != RETURN_REGISTER) {
-    output << INDENT << "mv    a0, " << dst.to_string() << std::endl;
+    output << INDENT << "mv    " << RETURN_REGISTER.to_string() << ", "
+           << dst.to_string() << std::endl;
   }
   output << INDENT << "ret" << std::endl;
-  return reg_t{'a', 0};
+  return RETURN_REGISTER;
 }
 
-reg_t CodeGenUnit::Visit(const koopa_raw_integer_t &num) {
+rv::Reg CodeGenUnit::Visit(const koopa_raw_integer_t &num) {
   // Escape early if it is zero, just use the zero register
   if (num.value == 0) {
     return ZERO_REGISTER;
   }
 
-  std::optional<reg_t> dst = this->ctx->get_avail();
+  std::optional<rv::Reg> dst = this->ctx->get_avail();
   if (dst) {
     output << INDENT << "li    " << dst->to_string() << ", " << num.value
            << std::endl;
@@ -115,25 +114,40 @@ reg_t CodeGenUnit::Visit(const koopa_raw_integer_t &num) {
   }
 }
 
-reg_t CodeGenUnit::Visit(const koopa_raw_binary_t &binary) {
-  reg_t l_reg = Visit(binary.lhs);
-  reg_t r_reg = Visit(binary.rhs);
-  reg_t dst;
-  switch (binary.op) {
-  case KOOPA_RBO_EQ: {
-    // Reuse one of the register
+rv::Reg CodeGenUnit::Visit(const koopa_raw_binary_t &binary) {
+  rv::Reg l_reg = Visit(binary.lhs);
+  rv::Reg r_reg = Visit(binary.rhs);
+  // HACK: I feel like it is always possible to reuse one of the registers now
+  //       since we only have one expression to parse.
+  rv::Reg dst = [&] {
     if (l_reg != ZERO_REGISTER) {
-      dst = l_reg;
+      return l_reg;
     } else if (r_reg != ZERO_REGISTER) {
-      dst = r_reg;
+      return r_reg;
     } else {
-      std::optional<reg_t> dst_req = this->ctx->get_avail();
+      std::optional<rv::Reg> dst_req = this->ctx->get_avail();
       if (dst_req) {
-        dst = dst_req.value();
+        return dst_req.value();
       } else {
         reallocate_register();
       }
     }
+  }();
+  switch (binary.op) {
+  case KOOPA_RBO_EQ: {
+    // std::optional<rv::Reg> dst_req = this->ctx->get_avail();
+    // if (l_reg != ZERO_REGISTER) {
+    //   dst_req = l_reg;
+    // } else if (r_reg != ZERO_REGISTER) {
+    //   dst_req = r_reg;
+    // } else {
+    //   std::optional<rv::Reg> dst_req = this->ctx->get_avail();
+    //   if (dst_req) {
+    //     dst_req = dst_req.value();
+    //   } else {
+    //     reallocate_register();
+    //   }
+    // }
 
     // XOR instruction
     this->output << INDENT << "xor   " << dst.to_string() << ", "
@@ -151,24 +165,24 @@ reg_t CodeGenUnit::Visit(const koopa_raw_binary_t &binary) {
     break;
   }
   case KOOPA_RBO_SUB: {
-    std::optional<reg_t> dst_req = this->ctx->get_avail();
-    if (dst_req) {
-      dst = dst_req.value();
-    } else {
-      reallocate_register();
-    }
+    // std::optional<rv::Reg> dst_req = this->ctx->get_avail();
+    // if (dst_req) {
+    //   dst = dst_req.value();
+    // } else {
+    //   reallocate_register();
+    // }
     this->output << INDENT << "sub   " << dst.to_string() << ", "
                  << l_reg.to_string() << ", " << r_reg.to_string() << std::endl;
     return dst;
     break;
   }
   case KOOPA_RBO_XOR: {
-    std::optional<reg_t> dst_req = this->ctx->get_avail();
-    if (dst_req) {
-      dst = dst_req.value();
-    } else {
-      reallocate_register();
-    }
+    // std::optional<rv::Reg> dst_req = this->ctx->get_avail();
+    // if (dst_req) {
+    //   dst = dst_req.value();
+    // } else {
+    //   reallocate_register();
+    // }
     this->output << INDENT << "xor   " << dst.to_string() << ", "
                  << l_reg.to_string() << ", " << r_reg.to_string() << std::endl;
     return dst;
@@ -181,6 +195,6 @@ reg_t CodeGenUnit::Visit(const koopa_raw_binary_t &binary) {
     break;
   }
   default:
-    LOG_ERROR("Unimplemented...");
+    LOG_ERROR("Unimplemented koopa binary operations...");
   }
 }
