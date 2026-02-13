@@ -1,4 +1,4 @@
-use sysy_il::c_ast::{Block, CompUnit, FuncDef, FuncType, Stmt, Exp, PrimaryExp, Number, UnaryExp, UnaryOp};
+use sysy_il::c_ast::{ Block, CompUnit, FuncDef, FuncType, Stmt, Exp, PrimaryExp, Number, UnaryExp, UnaryOp, MulExp, MulOp, AddExp, AddOp };
 
 grammar;
 
@@ -27,18 +27,18 @@ Block: Block = "{" <stmt: Stmt> "}" => Block { <> };
 
 Stmt: Stmt = "return" <exp: Exp> ";" => Stmt { <> };
 
-Exp: Exp = <unary_exp: UnaryExp> => Exp { unary_exp: Box::new(unary_exp) };
+Exp: Exp = <add_exp: AddExp> => Exp { add_exp: Box::new(add_exp) };
 
 PrimaryExp: PrimaryExp = {
-  "(" <exp: Exp> ")" => PrimaryExp::ExpPrimary { exp: Box::new(exp) },
-  <num: Number> => PrimaryExp::NumberPrimary { <> },
+  "(" <exp: Exp> ")" => PrimaryExp::Exp { exp: Box::new(exp) },
+  <num: Number> => PrimaryExp::Number { <> },
 };
 
 Number: Number = <num: IntConst> => <>;
 
 UnaryExp: UnaryExp = {
-  <primary_exp: PrimaryExp> => UnaryExp::PrimaryUnary{ primary_exp: Box::new(primary_exp) },
-  <op: UnaryOp> <e: UnaryExp> => UnaryExp::OpUnaryUnary{ unary_op: op, unary_exp: Box::new(e) }
+  <primary_exp: PrimaryExp> => UnaryExp::Primary{ primary_exp: Box::new(primary_exp) },
+  <op: UnaryOp> <e: UnaryExp> => UnaryExp::OpUnary{ unary_op: op, unary_exp: Box::new(e) }
 };
 
 // If you match identifer, return the string
@@ -57,4 +57,33 @@ UnaryOp: UnaryOp = {
   "-" => UnaryOp::MINUS,
   "!" => UnaryOp::BANG,
   "~" => UnaryOp::TILDE,
+}
+
+MulExp: MulExp = {
+  <u_exp: UnaryExp> => MulExp::Unary{ unary_exp: Box::new(u_exp) },
+  <m_exp: MulExp> <op: MulOp> <u_exp: UnaryExp> => MulExp::MulOpUnary{ 
+    mul_exp: Box::new(m_exp),
+    op: op,
+    unary_exp: Box::new(u_exp) 
+  },
+}
+
+AddExp: AddExp = {
+  <m_exp: MulExp> => AddExp::Mul{ mul_exp: Box::new(m_exp) },
+  <a_exp: AddExp> <op: AddOp> <m_exp: MulExp> => AddExp::AddOpMul{ 
+    add_exp: Box::new(a_exp),
+    op: op,
+    mul_exp: Box::new(m_exp) 
+  },
+}
+
+AddOp: AddOp = {
+  "+" => AddOp::PLUS,
+  "-" => AddOp::MINUS,
+}
+
+MulOp: MulOp = {
+  "*" => MulOp::STAR,
+  "/" => MulOp::SLASH,
+  "%" => MulOp::PERCENT,
 }

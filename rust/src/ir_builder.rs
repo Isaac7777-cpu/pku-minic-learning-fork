@@ -3,7 +3,10 @@ use koopa::ir::{
     builder::{BasicBlockBuilder, LocalInstBuilder, ValueBuilder},
 };
 
-use crate::c_ast::{Block, CompUnit, Exp, FuncDef, PrimaryExp, Stmt, UnaryExp, UnaryOp};
+use crate::c_ast::{
+    AddExp, AddOp, Block, CompUnit, Exp, FuncDef, MulExp, MulOp, PrimaryExp, Stmt, UnaryExp,
+    UnaryOp,
+};
 
 pub struct LowerCtx {
     pub program: Program,
@@ -54,20 +57,20 @@ impl LowerCtx {
     }
 
     pub fn lower_exp(&mut self, func: Function, exp: &Exp) -> Value {
-        self.lower_unary_exp(func, &exp.unary_exp)
+        self.lower_add_exp(func, &exp.add_exp)
     }
 
     pub fn lower_primary_exp(&mut self, func: Function, p_exp: &PrimaryExp) -> Value {
         match p_exp {
-            PrimaryExp::ExpPrimary { exp } => self.lower_exp(func, exp),
-            PrimaryExp::NumberPrimary { num } => self.construct_i32(func, *num)
+            PrimaryExp::Exp { exp } => self.lower_exp(func, exp),
+            PrimaryExp::Number { num } => self.construct_i32(func, *num),
         }
     }
 
     pub fn lower_unary_exp(&mut self, func: Function, unary_exp: &UnaryExp) -> Value {
         match unary_exp {
-            UnaryExp::PrimaryUnary { primary_exp } => self.lower_primary_exp(func, primary_exp),
-            UnaryExp::OpUnaryUnary {
+            UnaryExp::Primary { primary_exp } => self.lower_primary_exp(func, primary_exp),
+            UnaryExp::OpUnary {
                 unary_op,
                 unary_exp,
             } => {
@@ -86,6 +89,49 @@ impl LowerCtx {
                         let all_one = self.construct_i32(func, -1);
                         self.emit_binary(func, BinaryOp::Xor, u_exp_val, all_one)
                     }
+                }
+            }
+        }
+    }
+
+    pub fn lower_mul_exp(&mut self, func: Function, mul_exp: &MulExp) -> Value {
+        match mul_exp {
+            MulExp::Unary { unary_exp } => self.lower_unary_exp(func, unary_exp),
+            MulExp::MulOpUnary {
+                mul_exp,
+                op,
+                unary_exp,
+            } => {
+                let mul_exp_val = self.lower_mul_exp(func, mul_exp);
+                let unary_exp_val = self.lower_unary_exp(func, unary_exp);
+                match op {
+                    MulOp::STAR => {
+                        self.emit_binary(func, BinaryOp::Mul, mul_exp_val, unary_exp_val)
+                    }
+                    MulOp::SLASH => {
+                        self.emit_binary(func, BinaryOp::Div, mul_exp_val, unary_exp_val)
+                    }
+                    MulOp::PERCENT => {
+                        self.emit_binary(func, BinaryOp::Mod, mul_exp_val, unary_exp_val)
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn lower_add_exp(&mut self, func: Function, add_exp: &AddExp) -> Value {
+        match add_exp {
+            AddExp::Mul { mul_exp } => self.lower_mul_exp(func, mul_exp),
+            AddExp::AddOpMul {
+                add_exp,
+                op,
+                mul_exp,
+            } => {
+                let add_exp_val = self.lower_add_exp(func, add_exp);
+                let mul_exp_val = self.lower_mul_exp(func, mul_exp);
+                match op {
+                    AddOp::PLUS => self.emit_binary(func, BinaryOp::Add, add_exp_val, mul_exp_val),
+                    AddOp::MINUS => self.emit_binary(func, BinaryOp::Sub, add_exp_val, mul_exp_val),
                 }
             }
         }
