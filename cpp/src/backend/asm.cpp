@@ -46,7 +46,7 @@ std::string AsmInst::to_string() const {
           },
           [](const Mod &inst) {
             std::stringstream ss;
-            ss << "mod   " << inst.rd << ", " << inst.rs1 << ", " << inst.rs2;
+            ss << "rem   " << inst.rd << ", " << inst.rs1 << ", " << inst.rs2;
             return ss.str();
           },
           [](const Xor &inst) {
