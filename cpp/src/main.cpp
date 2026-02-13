@@ -1,8 +1,9 @@
-#include "c_ast.hpp"
-#include "codegen.hpp"
-#include "ir_builder.hpp"
-#include "koopa.h"
-#include "koopa_ast.hpp"
+#include "frontend/c_ast.hpp"
+#include "backend/codegen.hpp"
+#include "ir/ir_builder.hpp"
+#include "ir/koopa_ast.hpp"
+
+#include <koopa.h>
 #include <cassert>
 #include <cstdio>
 #include <cstring>

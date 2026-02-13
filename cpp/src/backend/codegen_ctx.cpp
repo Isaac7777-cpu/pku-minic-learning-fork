@@ -1,8 +1,8 @@
 #include "codegen_ctx.hpp"
-#include "logger.hpp"
 #include "reg.hpp"
+#include "util/logger.hpp"
 
-bool CodeGenCtx::is_avail(const rv::Reg &reg) {
+bool CodeGenCtx::is_avail(const riscv::Reg &reg) {
   if (reg.series() == 't') {
     return this->t_reg[reg.idx()];
   } else if (reg.series() == 'a') {
@@ -16,8 +16,8 @@ bool CodeGenCtx::is_avail(const rv::Reg &reg) {
 // 1. T-registers
 // 2. A-registers
 // but does not guarantee which one is free first.
-std::optional<rv::Reg> CodeGenCtx::get_avail() {
-  std::optional<rv::Reg> t_reg = get_avail('t');
+std::optional<riscv::Reg> CodeGenCtx::get_avail() {
+  std::optional<riscv::Reg> t_reg = get_avail('t');
   if (!t_reg) {
     return get_avail('a');
   } else {
@@ -25,12 +25,12 @@ std::optional<rv::Reg> CodeGenCtx::get_avail() {
   }
 }
 
-std::optional<rv::Reg> CodeGenCtx::get_avail(const char &series) {
+std::optional<riscv::Reg> CodeGenCtx::get_avail(const char &series) {
   if (series == 't') {
     for (int i = 0; i < 8; i++) {
       if (!t_reg[i]) {
         t_reg[i] = true;
-        return rv::Reg(rv::T{i});
+        return riscv::Reg(riscv::T{i});
       }
     }
     return std::nullopt;
@@ -38,7 +38,7 @@ std::optional<rv::Reg> CodeGenCtx::get_avail(const char &series) {
     for (int i = 1; i < 9; i++) {
       if (!a_reg[i % 8]) {
         a_reg[i % 8] = true;
-        return rv::Reg(rv::A{i});
+        return riscv::Reg(riscv::A{i});
       }
     }
     return std::nullopt;

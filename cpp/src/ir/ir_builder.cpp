@@ -2,7 +2,7 @@
  *  Function Definition for translation functions.                             *
  ******************************************************************************/
 
-#include "c_ast.hpp"
+#include "frontend/c_ast.hpp"
 #include "koopa_ast.hpp"
 #include <stdexcept>
 

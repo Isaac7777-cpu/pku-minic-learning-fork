@@ -6,6 +6,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <memory>
 
 // Helper function to get current time as string
 inline std::string GetTimestamp() {
@@ -47,4 +48,9 @@ inline void LogFunction(const std::string &level, const std::string &file,
 #define LOG_ERROR(msg) log_error_impl(__FILE__, __LINE__, (msg));
 
 // A helper function to demangle the type name
-std::string demangle(const char *);
+inline std::string demangle(const char *name) {
+  int status = -1;
+  std::unique_ptr<char, void (*)(void *)> res{
+      abi::__cxa_demangle(name, NULL, NULL, &status), std::free};
+  return (status == 0) ? res.get() : name;
+}

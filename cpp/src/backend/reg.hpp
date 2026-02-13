@@ -3,7 +3,7 @@
 #include <string>
 #include <variant>
 
-namespace rv {
+namespace riscv {
 
 struct Zero {};
 struct Ra {};
@@ -39,9 +39,10 @@ public:
 
   friend bool operator==(const Reg &lhs, const Reg &rhs);
   friend bool operator!=(const Reg &lhs, const Reg &rhs);
+  friend std::ostream &operator<<(std::ostream &os, const Reg &);
 
 private:
   Impl v_;
 };
 
-} // namespace rv
+} // namespace riscv

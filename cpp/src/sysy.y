@@ -1,7 +1,7 @@
 %code requires {
   #include <memory>
   #include <string>
-  #include "c_ast.hpp"
+  #include "frontend/c_ast.hpp"
 }
 
 %{
@@ -9,7 +9,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
-#include "c_ast.hpp"
+#include "frontend/c_ast.hpp"
 
 // Declare lexer function and error handling
 int yylex();
