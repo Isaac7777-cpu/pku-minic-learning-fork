@@ -1,6 +1,6 @@
 #pragma once
 
-// #include "backend/asm.hpp"
+#include "backend/asm.hpp"
 #include "codegen_ctx.hpp"
 #include "koopa.h"
 #include "reg.hpp"
@@ -38,7 +38,7 @@ private:
   riscv::Reg Visit(const koopa_raw_integer_t &) override;
   riscv::Reg Visit(const koopa_raw_binary_t &) override;
 
-  // void emit_inst(const riscv::AsmInst &);
+  void emit_inst(const riscv::AsmInst &);
 
 public:
   CodeGenUnit(std::ostream &_dest) : output(_dest) {

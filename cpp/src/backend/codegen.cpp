@@ -2,7 +2,7 @@
 #include <koopa.h>
 #include <string_view>
 
-// #include "backend/asm.hpp"
+#include "backend/asm.hpp"
 #include "backend/codegen.hpp"
 #include "backend/reg.hpp"
 #include "util/logger.hpp"
@@ -19,9 +19,9 @@ void CodeGenUnit::generate(const koopa_raw_program_t &program) {
   Visit(program);
 }
 
-// void CodeGenUnit::emit_inst(const riscv::AsmInst &inst) {
-//   this->output << INDENT << inst.to_string() << std::endl;
-// }
+void CodeGenUnit::emit_inst(const riscv::AsmInst &inst) {
+  this->output << INDENT << inst.to_string() << std::endl;
+}
 
 void CodeGenUnit::Visit(const koopa_raw_program_t &program) {
   Visit(program.values);
@@ -96,13 +96,10 @@ riscv::Reg CodeGenUnit::Visit(const koopa_raw_value_t &value) {
 riscv::Reg CodeGenUnit::Visit(const koopa_raw_return_t &ret) {
   riscv::Reg dst = Visit(ret.value);
   if (dst != RETURN_REGISTER) {
-    output << INDENT << "mv    " << RETURN_REGISTER.to_string() << ", "
-           << dst.to_string() << std::endl;
-    // riscv::AsmInst inst = riscv::AsmInst(riscv::Mv{RETURN_REGISTER, dst});
-    // this->emit_inst(inst);
+    riscv::AsmInst inst = riscv::AsmInst(riscv::Mv{RETURN_REGISTER, dst});
+    this->emit_inst(inst);
   }
-  output << INDENT << "ret" << std::endl;
-  // this->emit_inst(riscv::AsmInst(riscv::Ret{}));
+  this->emit_inst(riscv::AsmInst(riscv::Ret{}));
   return RETURN_REGISTER;
 }
 
@@ -114,10 +111,8 @@ riscv::Reg CodeGenUnit::Visit(const koopa_raw_integer_t &num) {
 
   std::optional<riscv::Reg> dst = this->ctx->get_avail();
   if (dst) {
-    output << INDENT << "li    " << dst->to_string() << ", " << num.value
-           << std::endl;
-    // riscv::AsmInst inst = riscv::AsmInst(riscv::Li{dst.value(), num.value});
-    // this->emit_inst(inst);
+    riscv::AsmInst inst = riscv::AsmInst(riscv::Li{dst.value(), num.value});
+    this->emit_inst(inst);
     return dst.value();
   } else {
     reallocate_register();
@@ -145,65 +140,44 @@ riscv::Reg CodeGenUnit::Visit(const koopa_raw_binary_t &binary) {
   }();
   switch (binary.op) {
   case KOOPA_RBO_EQ: {
-    // std::optional<riscv::Reg> dst_req = this->ctx->get_avail();
-    // if (l_reg != ZERO_REGISTER) {
-    //   dst_req = l_reg;
-    // } else if (r_reg != ZERO_REGISTER) {
-    //   dst_req = r_reg;
-    // } else {
-    //   std::optional<riscv::Reg> dst_req = this->ctx->get_avail();
-    //   if (dst_req) {
-    //     dst_req = dst_req.value();
-    //   } else {
-    //     reallocate_register();
-    //   }
-    // }
+    // Build XOR -> SEQZ instruction
+    riscv::AsmInst xor_inst = riscv::AsmInst(riscv::Xor{dst, l_reg, r_reg});
+    riscv::AsmInst seqz_inst = riscv::AsmInst(riscv::Seqz{dst, dst});
 
-    // XOR instruction
-    // riscv::AsmInst xor_inst = riscv::AsmInst(riscv::Xor{dst, l_reg, r_reg});
-    this->output << INDENT << "xor   " << dst.to_string() << ", "
-                 << l_reg.to_string() << ", " << r_reg.to_string() << std::endl;
-    // SEQZ instruction
-    this->output << INDENT << "seqz  " << dst.to_string() << ", "
-                 << dst.to_string() << std::endl;
+    // Emit instruction
+    this->emit_inst(xor_inst);
+    this->emit_inst(seqz_inst);
     return dst;
-    break;
   }
   case KOOPA_RBO_ADD: {
-    this->output << INDENT << "add   " << dst.to_string() << ", "
-                 << l_reg.to_string() << ", " << r_reg.to_string() << std::endl;
+    riscv::AsmInst add_inst = riscv::AsmInst(riscv::Add{dst, l_reg, r_reg});
+    this->emit_inst(add_inst);
     return dst;
-    break;
   }
   case KOOPA_RBO_SUB: {
-    // std::optional<riscv::Reg> dst_req = this->ctx->get_avail();
-    // if (dst_req) {
-    //   dst = dst_req.value();
-    // } else {
-    //   reallocate_register();
-    // }
-    this->output << INDENT << "sub   " << dst.to_string() << ", "
-                 << l_reg.to_string() << ", " << r_reg.to_string() << std::endl;
+    riscv::AsmInst sub_inst = riscv::AsmInst(riscv::Sub{dst, l_reg, r_reg});
+    this->emit_inst(sub_inst);
     return dst;
-    break;
-  }
-  case KOOPA_RBO_XOR: {
-    // std::optional<riscv::Reg> dst_req = this->ctx->get_avail();
-    // if (dst_req) {
-    //   dst = dst_req.value();
-    // } else {
-    //   reallocate_register();
-    // }
-    this->output << INDENT << "xor   " << dst.to_string() << ", "
-                 << l_reg.to_string() << ", " << r_reg.to_string() << std::endl;
-    return dst;
-    break;
   }
   case KOOPA_RBO_MUL: {
-    this->output << INDENT << "mul   " << dst.to_string() << ", "
-                 << l_reg.to_string() << ", " << r_reg.to_string() << std::endl;
+    riscv::AsmInst mul_inst = riscv::AsmInst(riscv::Mul{dst, l_reg, r_reg});
+    this->emit_inst(mul_inst);
     return dst;
-    break;
+  }
+  case KOOPA_RBO_DIV: {
+    riscv::AsmInst mul_inst = riscv::AsmInst(riscv::Div{dst, l_reg, r_reg});
+    this->emit_inst(mul_inst);
+    return dst;
+  }
+  case KOOPA_RBO_MOD: {
+    riscv::AsmInst mul_inst = riscv::AsmInst(riscv::Mod{dst, l_reg, r_reg});
+    this->emit_inst(mul_inst);
+    return dst;
+  }
+  case KOOPA_RBO_XOR: {
+    riscv::AsmInst xor_inst = riscv::AsmInst(riscv::Xor{dst, l_reg, r_reg});
+    this->emit_inst(xor_inst);
+    return dst;
   }
   default:
     LOG_ERROR("Unimplemented koopa binary operations...");
