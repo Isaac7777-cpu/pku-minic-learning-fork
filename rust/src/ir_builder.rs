@@ -180,3 +180,9 @@ impl LowerCtx {
             .expect("Duplicated instruction node.");
     }
 }
+
+impl Default for LowerCtx {
+    fn default() -> Self {
+        Self::new()
+    }
+}

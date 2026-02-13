@@ -49,11 +49,6 @@ impl<'a, W: Write> CodeGenCtx<'a, W> {
 
     pub fn emit_binary(&mut self, op: BinaryOp, dst: Reg, lhs: Reg, rhs: Reg) {
         match op {
-            BinaryOp::Sub => self.emit_inst(AsmInst::Sub {
-                rd: dst,
-                rs1: lhs,
-                rs2: rhs,
-            }),
             BinaryOp::Eq => {
                 self.emit_inst(AsmInst::Xor {
                     rd: dst,
@@ -62,6 +57,31 @@ impl<'a, W: Write> CodeGenCtx<'a, W> {
                 });
                 self.emit_inst(AsmInst::Seqz { rd: dst, rs: dst });
             }
+            BinaryOp::Add => self.emit_inst(AsmInst::Add {
+                rd: dst,
+                rs1: lhs,
+                rs2: rhs,
+            }),
+            BinaryOp::Sub => self.emit_inst(AsmInst::Sub {
+                rd: dst,
+                rs1: lhs,
+                rs2: rhs,
+            }),
+            BinaryOp::Mul => self.emit_inst(AsmInst::Mul {
+                rd: dst,
+                rs1: lhs,
+                rs2: rhs,
+            }),
+            BinaryOp::Div => self.emit_inst(AsmInst::Div {
+                rd: dst,
+                rs1: lhs,
+                rs2: rhs,
+            }),
+            BinaryOp::Mod => self.emit_inst(AsmInst::Mod {
+                rd: dst,
+                rs1: lhs,
+                rs2: rhs,
+            }),
             BinaryOp::Xor => self.emit_inst(AsmInst::Xor {
                 rd: dst,
                 rs1: lhs,
@@ -179,20 +199,24 @@ impl GenerateAsm for koopa::ir::Value {
                     (_, ValueKind::Integer(n)) if n.value() != 0 => rhs_reg,
                     _ => ctx.acquire_any_reg(),
                 };
-                match bin.op() {
-                    BinaryOp::Sub => {
-                        ctx.emit_binary(BinaryOp::Sub, dst, lhs_reg, rhs_reg);
-                    }
-                    BinaryOp::Eq => {
-                        ctx.emit_binary(BinaryOp::Eq, dst, lhs_reg, rhs_reg);
-                    }
-                    BinaryOp::Xor => {
-                        ctx.emit_binary(BinaryOp::Xor, dst, lhs_reg, rhs_reg);
-                    }
-                    _ => {
-                        unreachable!("Other operations are not yet implemetned")
-                    }
-                }
+                ctx.emit_binary(bin.op(), dst, lhs_reg, rhs_reg);
+                // match bin.op() {
+                //     BinaryOp::Add => {
+                //         ctx.emit_binary(BinaryOp::Add, dst, lhs_reg, rhs_reg);
+                //     }
+                //     BinaryOp::Sub => {
+                //         ctx.emit_binary(BinaryOp::Sub, dst, lhs_reg, rhs_reg);
+                //     }
+                //     BinaryOp::Eq => {
+                //         ctx.emit_binary(BinaryOp::Eq, dst, lhs_reg, rhs_reg);
+                //     }
+                //     BinaryOp::Xor => {
+                //         ctx.emit_binary(BinaryOp::Xor, dst, lhs_reg, rhs_reg);
+                //     }
+                //     _ => {
+                //         unreachable!("Other operations are not yet implemetned")
+                //     }
+                // }
                 ctx.val_reg_dict.insert(*self, dst);
                 Some(dst)
             }
