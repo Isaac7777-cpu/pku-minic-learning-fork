@@ -2,5 +2,5 @@
 /.cache/
 
 # Ignore testing artifacts
-*.koopa
-*.s
+/example/*
+!/example/*.c
