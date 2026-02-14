@@ -29,7 +29,7 @@ compile-koopa input output compiler_path=compiler_path:
   docker exec -it {{container}} {{compiler_path}} -koopa {{input}} -o {{output}}
 
 # Run the compiled compiler (default compiler path is in `./build/`)
-[group('RV32IM')]
+[group('riscv')]
 compile-riscv input output compiler_path=compiler_path:
   docker exec -it {{container}} {{compiler_path}} -riscv {{input}} -o {{output}}
 
@@ -37,8 +37,8 @@ compile-riscv input output compiler_path=compiler_path:
 [group('koopa')]
 run-koopa input output: build (compile-koopa input output)
 
-# Compile the source code of compiler and then run the compiler on the `input` to produce the `output` as RV32IM
-[group('RV32IM')]
+# Compile the source code of compiler and then run the compiler on the `input` to produce the `output` as riscv
+[group('riscv')]
 run-riscv input output: build (compile-riscv input output)
 
 # Run the built koopa file
@@ -55,7 +55,7 @@ exec-koopa name output_dir="example":
   '
 
 # Run the built RISC-V file
-[group('RV32IM')]
+[group('riscv')]
 exec-riscv name output_dir="example":
   docker exec -it {{container}} bash -lc '\
     set -euo pipefail; \
