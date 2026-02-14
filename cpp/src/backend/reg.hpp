@@ -20,6 +20,22 @@ struct S {
   int idx;
 };
 
+inline constexpr bool operator==(Zero, Zero) noexcept { return true; }
+inline constexpr bool operator==(Ra, Ra) noexcept { return true; }
+inline constexpr bool operator==(Sp, Sp) noexcept { return true; }
+inline constexpr bool operator==(Gp, Gp) noexcept { return true; }
+inline constexpr bool operator==(Tp, Tp) noexcept { return true; }
+
+inline constexpr bool operator==(const T &l, const T &r) {
+  return l.idx == r.idx;
+}
+inline constexpr bool operator==(const A &l, const A &r) {
+  return l.idx == r.idx;
+}
+inline constexpr bool operator==(const S &l, const S &r) {
+  return l.idx == r.idx;
+}
+
 class Reg {
 public:
   using Impl = std::variant<Zero, Ra, Sp, Gp, Tp, T, A, S>;
