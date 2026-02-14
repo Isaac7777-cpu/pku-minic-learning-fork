@@ -1,0 +1,69 @@
+# ---- config ----
+container := "minic-dev"
+build_dir := "build"
+build_type := "Debug"
+compiler_path := "./" + build_dir + "/compiler"
+
+# list recipes by default
+default:
+  @just --list
+
+# Run arbitrary shell commands inside the container
+[group('misc')]
+sh *args:
+    docker exec -it {{container}} bash -lc "{{args}}"
+
+# Update the compile_command.json
+[group('compiler')]
+configure:
+  docker exec -it {{container}} cmake -S . -B {{build_dir}} -DCMAKE_BUILD_TYPE={{build_type}}
+
+# Compile the compiler
+[group('compiler')]
+build: configure
+  docker exec -it {{container}} cmake --build {{build_dir}}
+
+# Run the compiled compiler (default compiler path is in `./build/`)
+[group('koopa')]
+compile-koopa input output compiler_path=compiler_path:
+  docker exec -it {{container}} {{compiler_path}} -koopa {{input}} -o {{output}}
+
+# Run the compiled compiler (default compiler path is in `./build/`)
+[group('RV32IM')]
+compile-riscv input output compiler_path=compiler_path:
+  docker exec -it {{container}} {{compiler_path}} -riscv {{input}} -o {{output}}
+
+# Compile the source code of compiler and then run the compiler on the `input` to produce the `output` as KoopaIR
+[group('koopa')]
+run-koopa input output: build (compile-koopa input output)
+
+# Compile the source code of compiler and then run the compiler on the `input` to produce the `output` as RV32IM
+[group('RV32IM')]
+run-riscv input output: build (compile-riscv input output)
+
+# Run the built koopa file
+[group('koopa')]
+exec-koopa name output_dir="example":
+  docker exec -it {{container}} bash -lc '\
+    set -euo pipefail; \
+    koopac ./{{output_dir}}/{{name}}.koopa | llc --filetype=obj -o ./{{output_dir}}/{{name}}.o; \
+    clang ./{{output_dir}}/{{name}}.o -L"$CDE_LIBRARY_PATH/native" -lsysy -o ./{{output_dir}}/{{name}}; \
+    ./{{output_dir}}/{{name}}; \
+    rc=$?; \
+    echo "exit code: $rc"; \
+    exit $rc \
+  '
+
+# Run the built RISC-V file
+[group('RV32IM')]
+exec-riscv name output_dir="example":
+  docker exec -it {{container}} bash -lc '\
+    set -euo pipefail; \
+    clang ./{{output_dir}}/{{name}}.S -c -o ./{{output_dir}}/{{name}}.o \
+      -target riscv32-unknown-linux-elf -march=rv32im -mabi=ilp32; \
+    ld.lld ./{{output_dir}}/{{name}}.o -L"$CDE_LIBRARY_PATH/riscv32" -lsysy -o ./{{output_dir}}/{{name}}; \
+    qemu-riscv32-static ./{{output_dir}}/{{name}}; \
+    rc=$?; \
+    echo "exit code: $rc"; \
+    exit $rc \
+  '
