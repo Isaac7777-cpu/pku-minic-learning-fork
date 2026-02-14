@@ -4,6 +4,8 @@ build_dir := "build"
 build_type := "Debug"
 compiler_path := "./" + build_dir + "/compiler"
 
+TARGET := "koopa"
+
 # list recipes by default
 default:
   @just --list
@@ -66,4 +68,29 @@ exec-riscv name output_dir="example":
     rc=$?; \
     echo "exit code: $rc"; \
     exit $rc \
+  '
+
+# compile the file to the correct format
+[arg("koopa", long="koopa", value="1")]
+[arg("riscv", long="riscv", value="1")]
+[group('compiler')]
+compile input output="" koopa="" riscv="" compiler_path=compiler_path:
+  docker exec -it {{container}} bash -lc '\
+    set -euo pipefail; \
+    in="{{input}}"; \
+    out="{{output}}"; \
+    tgt="riscv"; \
+    if [ -n "{{koopa}}" ]; then tgt="koopa"; fi; \
+    if [ -n "{{riscv}}" ]; then tgt="riscv"; fi; \
+    stem="$(basename "$in")"; stem="${stem%.*}"; \
+    if [ -z "$out" ]; then \
+      case "$tgt" in \
+        koopa) out="${stem}.koopa" ;; \
+        riscv) out="${stem}.S" ;; \
+      esac; \
+    fi; \
+    case "$tgt" in \
+      koopa) {{compiler_path}} -koopa "$in" -o "$out" ;; \
+      riscv) {{compiler_path}} -riscv "$in" -o "$out" ;; \
+    esac \
   '
