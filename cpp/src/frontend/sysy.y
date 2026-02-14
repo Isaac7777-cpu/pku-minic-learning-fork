@@ -30,7 +30,7 @@ using namespace std;
   c_ast::BaseAST *ast_val;
 }
 
-%token INT RETURN
+%token INT RETURN LE GE EQ NEQ AND OR
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
