@@ -80,7 +80,7 @@ public:
   void Dump() const override {
     std::cout << "CompUnitAST { ";
     func_def->Dump();
-    std::cout << "}";
+    std::cout << " }";
   }
 };
 
@@ -277,7 +277,7 @@ public:
   void Dump() const override {
     std::cout << "RelExpAST { ";
     add_exp->Dump();
-    std::cout << "}";
+    std::cout << " }";
   }
 };
 

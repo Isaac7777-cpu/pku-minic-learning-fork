@@ -94,3 +94,8 @@ compile input output="" koopa="" riscv="" compiler_path=compiler_path:
       riscv) {{compiler_path}} -riscv "$in" -o "$out" ;; \
     esac \
   '
+
+[arg("koopa", long="koopa", value="1")]
+[arg("riscv", long="riscv", value="1")]
+[group('compiler')]
+run input output="" koopa="" riscv="" compiler_path=compiler_path: build (compile input output koopa riscv compiler_path)
