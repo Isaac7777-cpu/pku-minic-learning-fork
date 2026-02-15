@@ -1,6 +1,6 @@
 use sysy_il::c_ast::{
   Block, CompUnit, FuncDef, FuncType, Stmt, Exp, PrimaryExp, Number, UnaryExp, 
-  UnaryOp, MulExp, MulOp, AddExp, AddOp 
+  UnaryOp, MulExp, MulOp, AddExp, AddOp , RelExp, RelOp, EqExp, EqOp, LAndExp, LOrExp
 };
 
 grammar;
@@ -30,7 +30,7 @@ Block: Block = "{" <stmt: Stmt> "}" => Block { <> };
 
 Stmt: Stmt = "return" <exp: Exp> ";" => Stmt { <> };
 
-Exp: Exp = <add_exp: AddExp> => Exp { add_exp: Box::new(add_exp) };
+Exp: Exp = <lor_exp: LOrExp> => Exp { lor_exp: Box::new(lor_exp) };
 
 PrimaryExp: PrimaryExp = {
   "(" <exp: Exp> ")" => PrimaryExp::Exp { exp: Box::new(exp) },
@@ -89,4 +89,50 @@ MulOp: MulOp = {
   "*" => MulOp::STAR,
   "/" => MulOp::SLASH,
   "%" => MulOp::PERCENT,
+}
+
+RelExp: RelExp = {
+  <a_exp: AddExp> => RelExp::Add { add_exp: Box::new(a_exp) },
+  <r_exp: RelExp> <op: RelOp> <a_exp: AddExp> => RelExp::RelOpAdd { 
+    rel_exp: Box::new(r_exp),
+    op: op,
+    add_exp: Box::new(a_exp),
+  }
+}
+
+RelOp: RelOp = {
+  "<" => RelOp::LT,
+  "<=" => RelOp::LE,
+  ">" => RelOp::GT,
+  ">=" => RelOp::GE,
+}
+
+EqExp: EqExp = {
+  <r_exp: RelExp> => EqExp::Rel { rel_exp: Box::new(r_exp) },
+  <e_exp: EqExp> <op: EqOp> <r_exp: RelExp> => EqExp::EqOpRel {
+    eq_exp: Box::new(e_exp),
+    op: op,
+    rel_exp: Box::new(r_exp),
+  }
+}
+
+EqOp: EqOp = {
+  "==" => EqOp::EQ,
+  "!=" => EqOp::NE,
+}
+
+LAndExp: LAndExp = {
+  <e_exp: EqExp> => LAndExp::Eq { eq_exp: Box::new(e_exp) },
+  <land_exp: LAndExp> "&&" <e_exp: EqExp> => LAndExp::LAndEq {
+    land_exp: Box::new(land_exp),
+    eq_exp: Box::new(e_exp),
+  }
+}
+
+LOrExp: LOrExp = {
+  <l_exp: LAndExp> => LOrExp::LAnd { land_exp: Box::new(l_exp) },
+  <lor_exp: LOrExp> "||" <land_exp: LAndExp> => LOrExp::LOrLAnd {
+    lor_exp: Box::new(lor_exp),
+    land_exp: Box::new(land_exp),
+  }
 }
