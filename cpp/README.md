@@ -66,3 +66,11 @@ Then, run the compiled program with,
 ```sh
 docker exec -it minic-dev ./build/compiler -koopa example/hello.c -o hello.koopa
 ```
+
+## Shortcut
+
+If you have [`just`](https://github.com/casey/just) installed, then you can use the just rules. To get started, you can use this command to see what you need:
+```sh
+just --list
+```
+
