@@ -36,7 +36,7 @@ using namespace std;
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
-%type <ast_val> FuncDef FuncType Block Stmt Exp PrimaryExp UnaryExp MulExp AddExp
+%type <ast_val> FuncDef FuncType Block Stmt Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
 %type <int_val> Number
 %type <unary_op_val> UnaryOp
 %type <mul_op_val> MulOp
@@ -92,10 +92,10 @@ Stmt
   ;
 
 Exp
-  : AddExp {
+  : LOrExp {
     auto ast_node = new c_ast::ExpAST();
 
-    ast_node->add_exp = std::unique_ptr<c_ast::BaseAST>($1);
+    ast_node->lor_exp = std::unique_ptr<c_ast::BaseAST>($1);
 
     $$ = ast_node;
   }
@@ -177,6 +177,76 @@ AddExp
     $$ = ast_node;
   }
 
+RelExp
+  : AddExp {
+    auto ast_node = new c_ast::RelExpASTAdd();
+
+    ast_node->add_exp = std::unique_ptr<c_ast::BaseAST>($1);
+
+    $$ = ast_node;
+  }
+  | RelExp RelOp AddExp {
+    auto ast_node = new c_ast::RelExpASTRelOpAdd();
+
+    ast_node->rel_op = $2;
+    ast_node->rel_exp = std::unique_ptr<c_ast::BaseAST>($1);
+    ast_node->add_exp = std::unique_ptr<c_ast::BaseAST>($3);
+
+    $$ = ast_node;
+  }
+
+EqExp
+  : RelExp {
+    auto ast_node = new c_ast::EqExpASTRel();
+
+    ast_node->rel_exp = std::unique_ptr<c_ast::BaseAST>($1);
+
+    $$ = ast_node;
+  }
+  | EqExp EqOp RelExp {
+    auto ast_node = new c_ast::EqExpASTEqOpRel();
+
+    ast_node->eq_op = $2;
+    ast_node->eq_exp = std::unique_ptr<c_ast::BaseAST>($1);
+    ast_node->rel_exp = std::unique_ptr<c_ast::BaseAST>($3);
+
+    $$ = ast_node;
+  }
+
+LAndExp
+  : EqExp {
+    auto ast_node = new c_ast::LAndExpASTEq();
+
+    ast_node->eq_exp = std::unique_ptr<c_ast::BaseAST>($1);
+
+    $$ = ast_node;
+  }
+  | LAndExp AND EqExp {
+    auto ast_node = new c_ast::LAndExpASTLAndEq();
+
+    ast_node->land_exp = std::unique_ptr<c_ast::BaseAST>($1);
+    ast_node->eq_exp = std::unique_ptr<c_ast::BaseAST>($3);
+
+    $$ = ast_node;
+  }
+
+LOrExp
+  : LAndExp {
+    auto ast_node = new c_ast::LOrExpASTLAnd();
+
+    ast_node->land_exp = std::unique_ptr<c_ast::BaseAST>($1);
+
+    $$ = ast_node;
+  }
+  | LOrExp OR LAndExp {
+    auto ast_node = new c_ast::LOrExpASTLOrLAnd();
+
+    ast_node->lor_exp = std::unique_ptr<c_ast::BaseAST>($1);
+    ast_node->land_exp = std::unique_ptr<c_ast::BaseAST>($3);
+
+    $$ = ast_node;
+  }
+
 UnaryOp
   : '+' {
     $$ = c_ast::UnaryOp::PLUS;
@@ -210,6 +280,27 @@ AddOp
     $$ = c_ast::AddOp::MINUS;
   }
 
+RelOp
+  : '<' {
+    $$ = c_ast::RelOp::LT;
+  }
+  | LE {
+    $$ = c_ast::RelOp::LE;
+  }
+  | '>' {
+    $$ = c_ast::RelOp::GT;
+  }
+  | GE {
+    $$ = c_ast::RelOp::GE;
+  }
+
+EqOp
+  : EQ {
+    $$ = c_ast::EqOp::EQ;
+  }
+  | NE {
+    $$ = c_ast::EqOp::NE;
+  }
 
 %%
 

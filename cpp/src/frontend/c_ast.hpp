@@ -284,11 +284,11 @@ public:
 class RelExpASTRelOpAdd final : public RelExpAST {
 public:
   std::unique_ptr<BaseAST> rel_exp;
-  RelOp op;
+  RelOp rel_op;
   std::unique_ptr<BaseAST> add_exp;
 
   void Dump() const override {
-    std::cout << "RelExpAST { " << ToString(this->op) << "( ";
+    std::cout << "RelExpAST { " << ToString(this->rel_op) << "( ";
     this->rel_exp->Dump();
     std::cout << " , ";
     this->add_exp->Dump();
@@ -315,11 +315,11 @@ public:
 class EqExpASTEqOpRel final : public EqExpAST {
 public:
   std::unique_ptr<BaseAST> eq_exp;
-  EqOp op;
+  EqOp eq_op;
   std::unique_ptr<BaseAST> rel_exp;
 
   void Dump() const override {
-    std::cout << "EqExpAST { " << ToString(op) << "( ";
+    std::cout << "EqExpAST { " << ToString(eq_op) << "( ";
     this->eq_exp->Dump();
     std::cout << " , ";
     this->rel_exp->Dump();
@@ -343,7 +343,7 @@ public:
   }
 };
 
-class LAndExpASTAndEq final : public LAndExpAST {
+class LAndExpASTLAndEq final : public LAndExpAST {
 public:
   std::unique_ptr<BaseAST> land_exp;
   std::unique_ptr<BaseAST> eq_exp;
