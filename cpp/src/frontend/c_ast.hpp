@@ -8,6 +8,8 @@ namespace c_ast {
 enum class UnaryOp { PLUS, MINUS, BANG, TILDE };
 enum class MulOp { STAR, SLASH, PERCENT };
 enum class AddOp { PLUS, MINUS };
+enum class RelOp { LT, LE, GT, GE };
+enum class EqOp { EQ, NE };
 
 inline const char *ToString(UnaryOp op) {
   switch (op) {
@@ -39,6 +41,28 @@ inline const char *ToString(AddOp op) {
     return "+";
   case AddOp::MINUS:
     return "-";
+  }
+}
+
+inline const char *ToString(RelOp op) {
+  switch (op) {
+  case RelOp::LT:
+    return "<";
+  case RelOp::LE:
+    return "<=";
+  case RelOp::GT:
+    return ">";
+  case RelOp::GE:
+    return ">=";
+  }
+}
+
+inline const char *ToString(EqOp op) {
+  switch (op) {
+  case EqOp::EQ:
+    return "==";
+  case EqOp::NE:
+    return "!=";
   }
 }
 
@@ -108,11 +132,11 @@ public:
 
 class ExpAST final : public BaseAST {
 public:
-  std::unique_ptr<BaseAST> add_exp;
+  std::unique_ptr<BaseAST> lor_exp;
 
   void Dump() const override {
     std::cout << "ExpAST { ";
-    add_exp->Dump();
+    lor_exp->Dump();
     std::cout << " }";
   }
 };
@@ -237,7 +261,129 @@ public:
     add_exp->Dump();
     std::cout << " , ";
     mul_exp->Dump();
+    std::cout << " ) }";
+  }
+};
+
+class RelExpAST : public BaseAST {
+public:
+  virtual ~RelExpAST() = default;
+};
+
+class RelExpASTAdd final : public RelExpAST {
+public:
+  std::unique_ptr<BaseAST> add_exp;
+
+  void Dump() const override {
+    std::cout << "RelExpAST { ";
+    add_exp->Dump();
+    std::cout << "}";
+  }
+};
+
+class RelExpASTRelOpAdd final : public RelExpAST {
+public:
+  std::unique_ptr<BaseAST> rel_exp;
+  RelOp op;
+  std::unique_ptr<BaseAST> add_exp;
+
+  void Dump() const override {
+    std::cout << "RelExpAST { " << ToString(this->op) << "( ";
+    this->rel_exp->Dump();
+    std::cout << " , ";
+    this->add_exp->Dump();
+    std::cout << " ) }";
+  }
+};
+
+class EqExpAST : public BaseAST {
+public:
+  virtual ~EqExpAST() = default;
+};
+
+class EqExpASTRel final : public EqExpAST {
+public:
+  std::unique_ptr<BaseAST> rel_exp;
+
+  void Dump() const override {
+    std::cout << "EqExpAST { ";
+    this->rel_exp->Dump();
     std::cout << " }";
+  }
+};
+
+class EqExpASTEqOpRel final : public EqExpAST {
+public:
+  std::unique_ptr<BaseAST> eq_exp;
+  EqOp op;
+  std::unique_ptr<BaseAST> rel_exp;
+
+  void Dump() const override {
+    std::cout << "EqExpAST { " << ToString(op) << "( ";
+    this->eq_exp->Dump();
+    std::cout << " , ";
+    this->rel_exp->Dump();
+    std::cout << " ) }";
+  }
+};
+
+class LAndExpAST : public BaseAST {
+public:
+  virtual ~LAndExpAST() = default;
+};
+
+class LAndExpASTEq final : public LAndExpAST {
+public:
+  std::unique_ptr<BaseAST> eq_exp;
+
+  void Dump() const override {
+    std::cout << "LAndExpAST { ";
+    this->eq_exp->Dump();
+    std::cout << " }";
+  }
+};
+
+class LAndExpASTAndEq final : public LAndExpAST {
+public:
+  std::unique_ptr<BaseAST> land_exp;
+  std::unique_ptr<BaseAST> eq_exp;
+
+  void Dump() const override {
+    std::cout << "LAndExpAST { &&( ";
+    this->land_exp->Dump();
+    std::cout << " , ";
+    this->eq_exp->Dump();
+    std::cout << " ) }";
+  };
+};
+
+class LOrExpAST : public BaseAST {
+public:
+  virtual ~LOrExpAST() = default;
+};
+
+class LOrExpASTLAnd final : public LOrExpAST {
+public:
+  std::unique_ptr<BaseAST> land_exp;
+
+  void Dump() const override {
+    std::cout << "LOrExpAST { ";
+    this->land_exp->Dump();
+    std::cout << " }";
+  }
+};
+
+class LOrExpASTLOrLAnd final : public LOrExpAST {
+public:
+  std::unique_ptr<BaseAST> lor_exp;
+  std::unique_ptr<BaseAST> land_exp;
+
+  void Dump() const override {
+    std::cout << "LOrExpAST { ||( ";
+    this->lor_exp->Dump();
+    std::cout << " , ";
+    this->land_exp->Dump();
+    std::cout << " ) }";
   }
 };
 

@@ -158,7 +158,7 @@ koopa_ast::Value *translate_stmt_c_ast(const c_ast::StmtAST &stmt,
  */
 koopa_ast::Value *translate_exp_c_ast(const c_ast::ExpAST &exp,
                                       koopa_ast::BasicBlock &block) {
-  auto *add_exp = dynamic_cast<const c_ast::AddExpAST *>(exp.add_exp.get());
+  auto *add_exp = dynamic_cast<const c_ast::AddExpAST *>(exp.lor_exp.get());
   if (!add_exp)
     throw std::runtime_error(
         "ir_builder error: ExpAST expects AddExpAST at param `add_exp`");

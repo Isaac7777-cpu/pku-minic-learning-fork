@@ -27,10 +27,12 @@ using namespace std;
   c_ast::UnaryOp unary_op_val;
   c_ast::MulOp mul_op_val;
   c_ast::AddOp add_op_val;
+  c_ast::RelOp rel_op_val;
+  c_ast::EqOp eq_op_val;
   c_ast::BaseAST *ast_val;
 }
 
-%token INT RETURN LE GE EQ NEQ AND OR
+%token INT RETURN LE GE EQ NE AND OR
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
@@ -39,6 +41,8 @@ using namespace std;
 %type <unary_op_val> UnaryOp
 %type <mul_op_val> MulOp
 %type <add_op_val> AddOp
+%type <rel_op_val> RelOp
+%type <eq_op_val> EqOp
 
 %destructor { delete $$; } <ast_val>
 %destructor { delete $$; } <str_val>
