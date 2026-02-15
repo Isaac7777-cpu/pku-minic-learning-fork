@@ -57,7 +57,8 @@ impl LowerCtx {
     }
 
     pub fn lower_exp(&mut self, func: Function, exp: &Exp) -> Value {
-        self.lower_add_exp(func, &exp.add_exp)
+        // self.lower_add_exp(func, &exp.add_exp)
+        todo!("Under construction to parse logical expression")
     }
 
     pub fn lower_primary_exp(&mut self, func: Function, p_exp: &PrimaryExp) -> Value {
