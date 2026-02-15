@@ -28,6 +28,14 @@ koopa_ast::Value *translate_mul_exp_c_ast(const c_ast::MulExpAST &,
                                           koopa_ast::BasicBlock &);
 koopa_ast::Value *translate_add_exp_c_ast(const c_ast::AddExpAST &,
                                           koopa_ast::BasicBlock &);
+koopa_ast::Value *translate_rel_exp_c_ast(const c_ast::RelExpAST &,
+                                          koopa_ast::BasicBlock &);
+koopa_ast::Value *translate_eq_exp_c_ast(const c_ast::EqExpAST &,
+                                         koopa_ast::BasicBlock &);
+koopa_ast::Value *translate_land_exp_c_ast(const c_ast::LAndExpAST &,
+                                           koopa_ast::BasicBlock &);
+koopa_ast::Value *translate_lor_exp_c_ast(const c_ast::LOrExpAST &,
+                                          koopa_ast::BasicBlock &);
 
 /*******************************************************************************
  *  Implementation Details for going from each C AST nodes to Koopa Node.      *
@@ -158,11 +166,11 @@ koopa_ast::Value *translate_stmt_c_ast(const c_ast::StmtAST &stmt,
  */
 koopa_ast::Value *translate_exp_c_ast(const c_ast::ExpAST &exp,
                                       koopa_ast::BasicBlock &block) {
-  auto *add_exp = dynamic_cast<const c_ast::AddExpAST *>(exp.lor_exp.get());
-  if (!add_exp)
+  auto *lor_exp = dynamic_cast<const c_ast::LOrExpAST *>(exp.lor_exp.get());
+  if (!lor_exp)
     throw std::runtime_error(
         "ir_builder error: ExpAST expects AddExpAST at param `add_exp`");
-  return translate_add_exp_c_ast(*add_exp, block);
+  return translate_lor_exp_c_ast(*lor_exp, block);
 }
 
 /**
@@ -188,7 +196,7 @@ koopa_ast::Value *translate_primary_exp_c_ast(const c_ast::PrimaryAST &primary,
   } else {
     throw std::runtime_error(
         "ir_builder error: PrimaryAST must have one of the following "
-        "implementation: {PrimaryASTExp, PrimaryASTNumber} ");
+        "implementation: {PrimaryASTExp, PrimaryASTNumber}");
   }
 }
 
@@ -254,7 +262,7 @@ koopa_ast::Value *translate_unary_exp_c_ast(const c_ast::UnaryExpAST &unary,
   } else {
     throw std::runtime_error(
         "ir_builder error: UnaryExpAST must have one of the following "
-        "implementation: {UnaryExpASTPrimary, UnaryExpASTOpUnary} ");
+        "implementation: {UnaryExpASTPrimary, UnaryExpASTOpUnary}");
   }
 }
 
@@ -302,7 +310,7 @@ koopa_ast::Value *translate_mul_exp_c_ast(const c_ast::MulExpAST &mul,
   } else {
     throw std::runtime_error(
         "ir_builder error: MulExpAST must have one of the following "
-        "implementation: {MulExpASTUnary, MulExpASTMulUnary} ");
+        "implementation: {MulExpASTUnary, MulExpASTMulUnary}");
   }
 }
 
@@ -342,7 +350,175 @@ koopa_ast::Value *translate_add_exp_c_ast(const c_ast::AddExpAST &add,
   } else {
     throw std::runtime_error(
         "ir_builder error: AddExpAST must have one of the following "
-        "implementation: {AddExpASTMul, AddExpASTAddMul} ");
+        "implementation: {AddExpASTMul, AddExpASTAddMul}");
+  }
+}
+
+koopa_ast::Value *translate_rel_exp_c_ast(const c_ast::RelExpAST &rel,
+                                          koopa_ast::BasicBlock &block) {
+  if (auto *p = dynamic_cast<const c_ast::RelExpASTAdd *>(&rel)) {
+    auto *add_exp = dynamic_cast<const c_ast::AddExpAST *>(p->add_exp.get());
+    if (!add_exp) {
+      throw std::runtime_error("ir_builder error: RelExpASTAdd expects "
+                               "AddExpAST at param `add_exp`");
+    }
+    return translate_add_exp_c_ast(*add_exp, block);
+  } else if (auto *p = dynamic_cast<const c_ast::RelExpASTRelOpAdd *>(&rel)) {
+    // Obtain the subnode
+    auto *rel_exp = dynamic_cast<const c_ast::RelExpAST *>(p->rel_exp.get());
+    if (!rel_exp) {
+      throw std::runtime_error("ir_builder error: RelExpASTRelOpAdd expects "
+                               "RelExpAST at param `rel_exp`");
+    }
+    auto *add_exp = dynamic_cast<const c_ast::AddExpAST *>(p->add_exp.get());
+    if (!add_exp) {
+      throw std::runtime_error("ir_builder error: RelExpASTRelOpAdd expects "
+                               "AddExpAST at param `add_exp`");
+    }
+
+    // Recursively parse the tree
+    auto *rel_exp_ast = translate_rel_exp_c_ast(*rel_exp, block);
+    auto *add_exp_ast = translate_add_exp_c_ast(*add_exp, block);
+
+    switch (p->rel_op) {
+    case c_ast::RelOp::LT:
+      return block.Make<koopa_ast::Binary>(true, koopa_ast::BinaryOp::Lt,
+                                           rel_exp_ast, add_exp_ast);
+    case c_ast::RelOp::LE:
+      return block.Make<koopa_ast::Binary>(true, koopa_ast::BinaryOp::Le,
+                                           rel_exp_ast, add_exp_ast);
+    case c_ast::RelOp::GT:
+      return block.Make<koopa_ast::Binary>(true, koopa_ast::BinaryOp::Gt,
+                                           rel_exp_ast, add_exp_ast);
+    case c_ast::RelOp::GE:
+      return block.Make<koopa_ast::Binary>(true, koopa_ast::BinaryOp::Ge,
+                                           rel_exp_ast, add_exp_ast);
+    }
+  } else {
+    throw std::runtime_error(
+        "ir_builder error: RelExpAST must have one of the following "
+        "implementation: {RelExpASTAdd, RelExpASTRelOpAdd}");
+  }
+}
+
+koopa_ast::Value *translate_eq_exp_c_ast(const c_ast::EqExpAST &eq,
+                                         koopa_ast::BasicBlock &block) {
+  if (auto *p = dynamic_cast<const c_ast::EqExpASTRel *>(&eq)) {
+    auto *rel_exp = dynamic_cast<const c_ast::RelExpAST *>(p->rel_exp.get());
+    if (!rel_exp) {
+      throw std::runtime_error("ir_builder error: EqExpASTRel expects "
+                               "RelExpAST at param `rel_exp`");
+    }
+    return translate_rel_exp_c_ast(*rel_exp, block);
+  } else if (auto *p = dynamic_cast<const c_ast::EqExpASTEqOpRel *>(&eq)) {
+    // Obtain the subnode
+    auto *eq_exp = dynamic_cast<const c_ast::EqExpAST *>(p->eq_exp.get());
+    if (!eq_exp) {
+      throw std::runtime_error("ir_builder error: RelExpASTRelOpAdd expects "
+                               "RelExpAST at param `rel_exp`");
+    }
+    auto *rel_exp = dynamic_cast<const c_ast::RelExpAST *>(p->rel_exp.get());
+    if (!rel_exp) {
+      throw std::runtime_error("ir_builder error: RelExpASTRelOpAdd expects "
+                               "RelExpAST at param `rel_exp`");
+    }
+
+    // Recursively parse the tree
+    auto *eq_exp_ast = translate_eq_exp_c_ast(*eq_exp, block);
+    auto *rel_exp_ast = translate_rel_exp_c_ast(*rel_exp, block);
+
+    switch (p->eq_op) {
+    case c_ast::EqOp::EQ:
+      return block.Make<koopa_ast::Binary>(true, koopa_ast::BinaryOp::Eq,
+                                           eq_exp_ast, rel_exp_ast);
+    case c_ast::EqOp::NE:
+      return block.Make<koopa_ast::Binary>(true, koopa_ast::BinaryOp::NotEq,
+                                           eq_exp_ast, rel_exp_ast);
+    }
+  } else {
+    throw std::runtime_error(
+        "ir_builder error: EqExpAST must have one of the following "
+        "implementation: {EqExpASTRel, EqExpASTRelOpAdd}");
+  }
+}
+
+koopa_ast::Value *translate_land_exp_c_ast(const c_ast::LAndExpAST &land,
+                                           koopa_ast::BasicBlock &block) {
+  if (auto *p = dynamic_cast<const c_ast::LAndExpASTEq *>(&land)) {
+    auto *eq_exp = dynamic_cast<const c_ast::EqExpAST *>(p->eq_exp.get());
+    if (!eq_exp) {
+      throw std::runtime_error(
+          "ir_builder error: LAndExpASTEq expects EqExpAST at param `eq_exp`");
+    }
+    return translate_eq_exp_c_ast(*eq_exp, block);
+  } else if (auto *p = dynamic_cast<const c_ast::LAndExpASTLAndEq *>(&land)) {
+    auto *land_exp = dynamic_cast<const c_ast::LAndExpAST *>(p->land_exp.get());
+    if (!land_exp) {
+      throw std::runtime_error("ir_builder error: LAndExpASTLAndEq expects "
+                               "LAndExpAST at param `land_exp`");
+    }
+    auto *eq_exp = dynamic_cast<const c_ast::EqExpAST *>(p->eq_exp.get());
+    if (!eq_exp) {
+      throw std::runtime_error("ir_builder error: LAndExpASTLAndEq expects "
+                               "EqExpAST at param `eq_exp`");
+    }
+
+    // Recursively parsing
+    auto *land_exp_ast = translate_land_exp_c_ast(*land_exp, block);
+    auto *eq_exp_ast = translate_eq_exp_c_ast(*eq_exp, block);
+
+    // Build the instruction in koopa
+    auto *zero = block.Make<koopa_ast::Integer>(false, 0);
+    auto *left_bool = block.Make<koopa_ast::Binary>(
+        true, koopa_ast::BinaryOp::NotEq, land_exp_ast, zero);
+    auto *right_bool = block.Make<koopa_ast::Binary>(
+        true, koopa_ast::BinaryOp::NotEq, eq_exp_ast, zero);
+    return block.Make<koopa_ast::Binary>(true, koopa_ast::BinaryOp::And,
+                                         left_bool, right_bool);
+  } else {
+    throw std::runtime_error(
+        "ir_builder error: LAndExpAST must have one of the following "
+        "implementation: {LAndExpASTEq, LAndExpASTLAndEq}");
+  }
+}
+
+koopa_ast::Value *translate_lor_exp_c_ast(const c_ast::LOrExpAST &lor,
+                                          koopa_ast::BasicBlock &block) {
+  if (auto *p = dynamic_cast<const c_ast::LOrExpASTLAnd *>(&lor)) {
+    auto *land_exp = dynamic_cast<const c_ast::LAndExpAST *>(p->land_exp.get());
+    if (!land_exp) {
+      throw std::runtime_error("ir_builder error: LOrExpASTLAnd expects "
+                               "LAndExpAST at param `land_exp`");
+    }
+    return translate_land_exp_c_ast(*land_exp, block);
+  } else if (auto *p = dynamic_cast<const c_ast::LOrExpASTLOrLAnd *>(&lor)) {
+    auto *lor_exp = dynamic_cast<const c_ast::LOrExpAST *>(p->lor_exp.get());
+    if (!lor_exp) {
+      throw std::runtime_error("ir_builder error: LOrExpASTLOrLAnd expects "
+                               "LOrExpAST at param `lor_exp`");
+    }
+    auto *land_exp = dynamic_cast<const c_ast::LAndExpAST *>(p->land_exp.get());
+    if (!land_exp) {
+      throw std::runtime_error("ir_builder error: LOrExpASTLOrLAnd expects "
+                               "LAndExpAST at param `land_exp`");
+    }
+
+    // Recursive parse
+    auto *lor_exp_ast = translate_lor_exp_c_ast(*lor_exp, block);
+    auto *land_exp_ast = translate_land_exp_c_ast(*land_exp, block);
+
+    // Build the instruction
+    auto *zero = block.Make<koopa_ast::Integer>(false, 0);
+    auto *left_bool = block.Make<koopa_ast::Binary>(
+        true, koopa_ast::BinaryOp::NotEq, lor_exp_ast, zero);
+    auto *right_bool = block.Make<koopa_ast::Binary>(
+        true, koopa_ast::BinaryOp::NotEq, land_exp_ast, zero);
+    return block.Make<koopa_ast::Binary>(true, koopa_ast::BinaryOp::Or,
+                                         left_bool, right_bool);
+  } else {
+    throw std::runtime_error(
+        "ir_builder error: LOrExpAST must have one of the following "
+        "implementation: {LOrExpASTLAnd, LOrExpASTLOrLAnd}");
   }
 }
 
