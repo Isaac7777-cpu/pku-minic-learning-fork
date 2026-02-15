@@ -149,6 +149,69 @@ riscv::Reg CodeGenUnit::Visit(const koopa_raw_binary_t &binary) {
     this->emit_inst(seqz_inst);
     return dst;
   }
+  case KOOPA_RBO_NOT_EQ: {
+    // xor instructions -> snez (to normalise to 0/1)
+    riscv::AsmInst xor_inst = riscv::AsmInst(riscv::Xor{dst, l_reg, r_reg});
+    riscv::AsmInst snez_inst = riscv::AsmInst(riscv::Snez{dst, dst});
+
+    // Emit instruction
+    this->emit_inst(xor_inst);
+    this->emit_inst(snez_inst);
+    return dst;
+  }
+  case KOOPA_RBO_LT: {
+    // slt instruction
+    riscv::AsmInst slt_inst = riscv::AsmInst(riscv::Slt{dst, l_reg, r_reg});
+
+    // Emit instruction
+    this->emit_inst(slt_inst);
+    return dst;
+  }
+  case KOOPA_RBO_LE: {
+    // sgt instruction (inverse slt) -> xor with 1 to take negation
+    // (a <= b <=> !(a > b)
+    riscv::AsmInst sgt_inst = riscv::AsmInst(riscv::Sgt{dst, l_reg, r_reg});
+    riscv::AsmInst xor_inst = riscv::AsmInst(riscv::Xori{dst, dst, 1});
+
+    // emit instruction
+    this->emit_inst(sgt_inst);
+    this->emit_inst(xor_inst);
+    return dst;
+  }
+  case KOOPA_RBO_GT: {
+    // sgt instruction (inverse slt) (a > b <=> b < a)
+    riscv::AsmInst sgt_inst = riscv::AsmInst(riscv::Sgt{dst, l_reg, r_reg});
+
+    // Emit instruction
+    this->emit_inst(sgt_inst);
+    return dst;
+  }
+  case KOOPA_RBO_GE: {
+    // slt instruction -> xor with 1 to take negation (a >= b <=> !(a < b))
+    riscv::AsmInst slt_inst = riscv::AsmInst(riscv::Slt{dst, l_reg, r_reg});
+    riscv::AsmInst xor_inst = riscv::AsmInst(riscv::Xori{dst, dst, 1});
+
+    // emit instruction
+    this->emit_inst(slt_inst);
+    this->emit_inst(xor_inst);
+    return dst;
+  }
+  case KOOPA_RBO_AND: {
+    // Since Koopa `and` inst is already bitwise, use `and` in riscv
+    riscv::AsmInst and_inst = riscv::AsmInst(riscv::And{dst, l_reg, r_reg});
+
+    // emit instruction
+    this->emit_inst(and_inst);
+    return dst;
+  }
+  case KOOPA_RBO_OR: {
+    // Since Koopa `or` inst is already bitwise, use `or` in riscv
+    riscv::AsmInst or_inst = riscv::AsmInst(riscv::Or{dst, l_reg, r_reg});
+
+    // emit instruction
+    this->emit_inst(or_inst);
+    return dst;
+  }
   case KOOPA_RBO_ADD: {
     riscv::AsmInst add_inst = riscv::AsmInst(riscv::Add{dst, l_reg, r_reg});
     this->emit_inst(add_inst);
