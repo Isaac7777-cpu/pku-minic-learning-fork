@@ -71,6 +71,29 @@ docker exec -it minic-dev ./build/compiler -koopa example/hello.c -o hello.koopa
 
 If you have [`just`](https://github.com/casey/just) installed, then you can use the just rules. To get started, you can use this command to see what you need:
 ```sh
-just --list
+> just --list
+
+Available recipes:
+    default                              # list recipes by default
+
+    [compiler]
+    build                                # Compile the compiler
+    compile input output="" koopa="" riscv="" compiler_path=compiler_path # compile the file to the correct format
+    configure                            # Update the compile_command.json
+    run input output="" koopa="" riscv="" compiler_path=compiler_path
+
+    [koopa]
+    compile-koopa input output compiler_path=compiler_path # Run the compiled compiler (default compiler path is in `./build/`)
+    exec-koopa name output_dir="example" # Run the built koopa file
+    run-koopa input output               # Compile the source code of compiler and then run the compiler on the `input` to produce the `output` as KoopaIR
+
+    [misc]
+    sh *args                             # Run arbitrary shell commands inside the container
+
+    [riscv]
+    compile-riscv input output compiler_path=compiler_path # Run the compiled compiler (default compiler path is in `./build/`)
+    exec-riscv name output_dir="example" # Run the built RISC-V file
+    run-riscv input output               # Compile the source code of compiler and then run the compiler on the `input` to produce the `output` as riscv
+
 ```
 
