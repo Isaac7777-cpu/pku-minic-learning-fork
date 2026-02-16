@@ -4,8 +4,8 @@ use koopa::ir::{
 };
 
 use crate::c_ast::{
-    AddExp, AddOp, Block, CompUnit, Exp, FuncDef, MulExp, MulOp, PrimaryExp, Stmt, UnaryExp,
-    UnaryOp,
+    AddExp, AddOp, Block, CompUnit, EqExp, Exp, FuncDef, LAndExp, LOrExp, MulExp, MulOp,
+    PrimaryExp, RelExp, Stmt, UnaryExp, UnaryOp,
 };
 
 pub struct LowerCtx {
@@ -57,8 +57,7 @@ impl LowerCtx {
     }
 
     pub fn lower_exp(&mut self, func: Function, exp: &Exp) -> Value {
-        // self.lower_add_exp(func, &exp.add_exp)
-        todo!("Under construction to parse logical expression")
+        self.lower_lor_exp(func, &exp.lor_exp)
     }
 
     pub fn lower_primary_exp(&mut self, func: Function, p_exp: &PrimaryExp) -> Value {
@@ -134,6 +133,87 @@ impl LowerCtx {
                     AddOp::PLUS => self.emit_binary(func, BinaryOp::Add, add_exp_val, mul_exp_val),
                     AddOp::MINUS => self.emit_binary(func, BinaryOp::Sub, add_exp_val, mul_exp_val),
                 }
+            }
+        }
+    }
+
+    pub fn lower_rel_exp(&mut self, func: Function, rel_exp: &RelExp) -> Value {
+        match rel_exp {
+            RelExp::Add { add_exp } => self.lower_add_exp(func, add_exp),
+            RelExp::RelOpAdd {
+                rel_exp,
+                op,
+                add_exp,
+            } => {
+                let rel_exp_val = self.lower_rel_exp(func, rel_exp);
+                let add_exp_val = self.lower_add_exp(func, add_exp);
+                match op {
+                    crate::c_ast::RelOp::LT => {
+                        self.emit_binary(func, BinaryOp::Lt, rel_exp_val, add_exp_val)
+                    }
+                    crate::c_ast::RelOp::LE => {
+                        self.emit_binary(func, BinaryOp::Le, rel_exp_val, add_exp_val)
+                    }
+                    crate::c_ast::RelOp::GT => {
+                        self.emit_binary(func, BinaryOp::Gt, rel_exp_val, add_exp_val)
+                    }
+                    crate::c_ast::RelOp::GE => {
+                        self.emit_binary(func, BinaryOp::Ge, rel_exp_val, add_exp_val)
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn lower_eq_exp(&mut self, func: Function, eq_exp: &EqExp) -> Value {
+        match eq_exp {
+            EqExp::Rel { rel_exp } => self.lower_rel_exp(func, rel_exp),
+            EqExp::EqOpRel {
+                eq_exp,
+                op,
+                rel_exp,
+            } => {
+                let eq_exp_val = self.lower_eq_exp(func, eq_exp);
+                let rel_exp_val = self.lower_rel_exp(func, rel_exp);
+
+                match op {
+                    crate::c_ast::EqOp::EQ => {
+                        self.emit_binary(func, BinaryOp::Eq, eq_exp_val, rel_exp_val)
+                    }
+                    crate::c_ast::EqOp::NE => {
+                        self.emit_binary(func, BinaryOp::NotEq, eq_exp_val, rel_exp_val)
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn lower_land_exp(&mut self, func: Function, land_exp: &LAndExp) -> Value {
+        match land_exp {
+            LAndExp::Eq { eq_exp } => self.lower_eq_exp(func, eq_exp),
+            LAndExp::LAndEq { land_exp, eq_exp } => {
+                let land_exp_val = self.lower_land_exp(func, land_exp);
+                let eq_exp_val = self.lower_eq_exp(func, eq_exp);
+
+                let zero = self.construct_i32(func, 0);
+                let lhs_bool = self.emit_binary(func, BinaryOp::NotEq, land_exp_val, zero);
+                let rhs_bool = self.emit_binary(func, BinaryOp::NotEq, eq_exp_val, zero);
+                self.emit_binary(func, BinaryOp::And, lhs_bool, rhs_bool)
+            }
+        }
+    }
+
+    pub fn lower_lor_exp(&mut self, func: Function, lor_exp: &LOrExp) -> Value {
+        match lor_exp {
+            LOrExp::LAnd { land_exp } => self.lower_land_exp(func, land_exp),
+            LOrExp::LOrLAnd { lor_exp, land_exp } => {
+                let lor_exp_val = self.lower_lor_exp(func, lor_exp);
+                let land_exp_val = self.lower_land_exp(func, land_exp);
+
+                let zero = self.construct_i32(func, 0);
+                let lhs_bool = self.emit_binary(func, BinaryOp::NotEq, lor_exp_val, zero);
+                let rhs_bool = self.emit_binary(func, BinaryOp::NotEq, land_exp_val, zero);
+                self.emit_binary(func, BinaryOp::Or, lhs_bool, rhs_bool)
             }
         }
     }
