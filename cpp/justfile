@@ -26,25 +26,25 @@ build: configure
   docker exec -it {{container}} cmake --build {{build_dir}}
 
 # Run the compiled compiler (default compiler path is in `./build/`)
-[group('koopa')]
+[group('compiler')]
 compile-koopa input output compiler_path=compiler_path:
   docker exec -it {{container}} {{compiler_path}} -koopa {{input}} -o {{output}}
 
 # Run the compiled compiler (default compiler path is in `./build/`)
-[group('riscv')]
+[group('compiler')]
 compile-riscv input output compiler_path=compiler_path:
   docker exec -it {{container}} {{compiler_path}} -riscv {{input}} -o {{output}}
 
 # Compile the source code of compiler and then run the compiler on the `input` to produce the `output` as KoopaIR
-[group('koopa')]
+[group('compiler')]
 run-koopa input output: build (compile-koopa input output)
 
 # Compile the source code of compiler and then run the compiler on the `input` to produce the `output` as riscv
-[group('riscv')]
+[group('compiler')]
 run-riscv input output: build (compile-riscv input output)
 
 # Run the built koopa file
-[group('koopa')]
+[group('exec')]
 exec-koopa name output_dir="example":
   docker exec -it {{container}} bash -lc '\
     set -euo pipefail; \
@@ -57,7 +57,7 @@ exec-koopa name output_dir="example":
   '
 
 # Run the built RISC-V file
-[group('riscv')]
+[group('exec')]
 exec-riscv name output_dir="example":
   docker exec -it {{container}} bash -lc '\
     set -euo pipefail; \
@@ -95,7 +95,25 @@ compile input output="" koopa="" riscv="" compiler_path=compiler_path:
     esac \
   '
 
+# Build and run the project, using flags `--koopa` or `--riscv` to specify the target language
 [arg("koopa", long="koopa", value="1")]
 [arg("riscv", long="riscv", value="1")]
 [group('compiler')]
 run input output="" koopa="" riscv="" compiler_path=compiler_path: build (compile input output koopa riscv compiler_path)
+
+# Testing command, indicate the level (lv1, lv2 (non-existent), lv3, ...) then indicate which mode to test for by using flag argument `--koopa` or `--riscv` (can be both and default to both.)
+[arg("koopa", long="koopa", value="1")]
+[arg("riscv", long="riscv", value="1")]
+[group("testing")]
+test level koopa="" riscv="":
+  @if [ -n "{{koopa}}" ] && [ -n "{{riscv}}" ]; then \
+    docker exec -it minic-dev autotest -koopa -s {{level}} ./; \
+    docker exec -it minic-dev autotest -riscv -s {{level}} ./; \
+  elif [ -n "{{koopa}}" ]; then \
+    docker exec -it minic-dev autotest -koopa -s {{level}} ./; \
+  elif [ -n "{{riscv}}" ]; then \
+    docker exec -it minic-dev autotest -riscv -s {{level}} ./; \
+  else \
+    docker exec -it minic-dev autotest -koopa -s {{level}} ./; \
+    docker exec -it minic-dev autotest -riscv -s {{level}} ./; \
+  fi
