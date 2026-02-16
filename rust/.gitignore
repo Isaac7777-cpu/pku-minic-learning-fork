@@ -14,8 +14,8 @@ target
 **/mutants.out*/
 
 # Ignored the generated IR
-*.koopa
-*.s
+/example/*
+!/example/*.c
 
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
