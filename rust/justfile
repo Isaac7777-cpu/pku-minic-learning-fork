@@ -1,0 +1,135 @@
+# ---- config ----
+profile := "debug"                # "debug" or "release"
+target_dir := "target"
+bin_name := "compiler"
+
+# where cargo puts the binary
+compiler_path := if profile == "release" {
+  "./" + target_dir + "/release/" + bin_name
+} else {
+  "./" + target_dir + "/debug/" + bin_name
+}
+
+# list recipes by default
+default:
+  @just --list
+
+# Run arbitrary shell commands on host
+[group("misc")]
+sh *args:
+  bash -lc "{{args}}"
+
+# call cargo build
+[group("compiler")]
+build:
+  @set -euo pipefail; \
+  if [ "{{profile}}" = "release" ]; then \
+    cargo build --release; \
+  else \
+    cargo build; \
+  fi
+
+# Using the compiled compiler to compile the `C` code. This will not auto build the project
+[group("compiler")]
+compile-koopa input output compiler_path=compiler_path:
+  {{compiler_path}} -koopa {{input}} -o {{output}}
+
+# Using the compiled compiler to compile the `C` code. This will not auto build the project
+[group("compiler")]
+compile-riscv input output compiler_path=compiler_path:
+  {{compiler_path}} -riscv {{input}} -o {{output}}
+
+# Wraper for cargo run with koopa target
+[group("compiler")]
+run-koopa input output: 
+  @set -euo pipefail; \
+  if [ "{{profile}}" = "release" ]; then \
+    cargo run --release -- -koopa {{input}} -o {{output}}; \
+  else \
+    cargo run -- -koopa {{input}} -o {{output}}; \
+  fi
+
+# Wraper for cargo run with riscv target
+[group("compiler")]
+run-riscv input output:
+  @set -euo pipefail; \
+  if [ "{{profile}}" = "release" ]; then \
+    cargo run --release -- -koopa {{input}} -o {{output}}; \
+  else \
+    cargo run -- -koopa {{input}} -o {{output}}; \
+  fi
+
+# @deprecated: This is only required in C++ where the compiler does not support run command
+[arg("koopa", long="koopa", value="1")]
+[arg("riscv", long="riscv", value="1")]
+[group("compiler")]
+compile input output="" koopa="" riscv="" compiler_path=compiler_path:
+  @echo "Just use run with cargo as cargo will also build when called with cargo run..."
+
+# Run the project, compile if needed. Using flags (`--koopa` or `--riscv`) to indicate what to build to
+[arg("koopa", long="koopa", value="1")]
+[arg("riscv", long="riscv", value="1")]
+[group("compiler")]
+run input output="" koopa="" riscv="" compiler_path=compiler_path: 
+  bash -lc '\
+    set -euo pipefail; \
+    in="{{input}}"; \
+    out="{{output}}"; \
+    tgt="riscv"; \
+    if [ -n "{{koopa}}" ] && [ -n "{{riscv}}" ]; then \
+      echo "error: choose only one of --koopa or --riscv" >&2; exit 1; \
+    fi; \
+    if [ -n "{{koopa}}" ]; then tgt="koopa"; fi; \
+    if [ -n "{{riscv}}" ]; then tgt="riscv"; fi; \
+    stem="$(basename "$in")"; stem="${stem%.*}"; \
+    if [ -z "$out" ]; then \
+      case "$tgt" in \
+        koopa) out="${stem}.koopa" ;; \
+        riscv) out="${stem}.S" ;; \
+      esac; \
+    fi; \
+    case "$tgt" in \
+      koopa) "{{compiler_path}}" -koopa "$in" -o "$out" ;; \
+      riscv) "{{compiler_path}}" -riscv "$in" -o "$out" ;; \
+    esac \
+  '
+
+# Execute the given KoopaIR file. Note that name should just be the filename and the `output_dir` should be the dir containing the input and also the place where output is produced.
+[group("exec")]
+exec-koopa name output_dir="example":
+  bash -lc '\
+    set -euo pipefail; \
+    koopac "./{{output_dir}}/{{name}}.koopa" | llc --filetype=obj -o "./{{output_dir}}/{{name}}.o"; \
+    clang "./{{output_dir}}/{{name}}.o" -L"$CDE_LIBRARY_PATH/native" -lsysy -o "./{{output_dir}}/{{name}}"; \
+    "./{{output_dir}}/{{name}}"; \
+    rc=$$?; echo "exit code: $$rc"; exit $$rc \
+  '
+
+# Execute the given RISC-V file. Note that name should just be the filename and the `output_dir` should be the dir containing the input and also the place where output is produced.
+[group("exec")]
+exec-riscv name output_dir="example":
+  bash -lc '\
+    set -euo pipefail; \
+    clang "./{{output_dir}}/{{name}}.S" -c -o "./{{output_dir}}/{{name}}.o" \
+      -target riscv32-unknown-linux-elf -march=rv32im -mabi=ilp32; \
+    ld.lld "./{{output_dir}}/{{name}}.o" -L"$CDE_LIBRARY_PATH/riscv32" -lsysy -o "./{{output_dir}}/{{name}}"; \
+    qemu-riscv32-static "./{{output_dir}}/{{name}}"; \
+    rc=$$?; echo "exit code: $$rc"; exit $$rc \
+  '
+
+# Testing command, indicate the level (lv1, lv2 (non-existent), lv3, ...) then indicate which mode to test for by using flag argument `--koopa` or `--riscv` (can be both and default to both.)
+[arg("koopa", long="koopa", value="1")]
+[arg("riscv", long="riscv", value="1")]
+[group("testing")]
+test level koopa="" riscv="":
+  @if [ -n "{{koopa}}" ] && [ -n "{{riscv}}" ]; then \
+    docker run -it --rm -v "$(pwd)":/root/compiler -w /root/compiler maxxing/compiler-dev autotest -riscv -s {{level}} /root/compiler ; \
+    docker run -it --rm -v "$(pwd)":/root/compiler -w /root/compiler maxxing/compiler-dev autotest -riscv -s {{level}} /root/compiler ; \
+  elif [ -n "{{koopa}}" ]; then \
+    docker run -it --rm -v "$(pwd)":/root/compiler -w /root/compiler maxxing/compiler-dev autotest -riscv -s {{level}} /root/compiler ; \
+  elif [ -n "{{riscv}}" ]; then \
+    docker run -it --rm -v "$(pwd)":/root/compiler -w /root/compiler maxxing/compiler-dev autotest -riscv -s {{level}} /root/compiler ; \
+  else \
+    docker run -it --rm -v "$(pwd)":/root/compiler -w /root/compiler maxxing/compiler-dev autotest -riscv -s {{level}} /root/compiler ; \
+    docker run -it --rm -v "$(pwd)":/root/compiler -w /root/compiler maxxing/compiler-dev autotest -riscv -s {{level}} /root/compiler ; \
+  fi
