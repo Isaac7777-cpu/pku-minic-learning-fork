@@ -57,6 +57,48 @@ impl<'a, W: Write> CodeGenCtx<'a, W> {
                 });
                 self.emit_inst(AsmInst::Seqz { rd: dst, rs: dst });
             }
+            BinaryOp::NotEq => {
+                self.emit_inst(AsmInst::Xor {
+                    rd: dst,
+                    rs1: lhs,
+                    rs2: rhs,
+                });
+                self.emit_inst(AsmInst::Snez { rd: dst, rs: dst });
+            }
+            BinaryOp::Lt => self.emit_inst(AsmInst::Slt {
+                rd: dst,
+                rs1: lhs,
+                rs2: rhs,
+            }),
+            BinaryOp::Le => {
+                self.emit_inst(AsmInst::Sgt {
+                    rd: dst,
+                    rs1: lhs,
+                    rs2: rhs,
+                });
+                self.emit_inst(AsmInst::Xori {
+                    rd: dst,
+                    rs: dst,
+                    imm: 1,
+                });
+            }
+            BinaryOp::Gt => self.emit_inst(AsmInst::Sgt {
+                rd: dst,
+                rs1: lhs,
+                rs2: rhs,
+            }),
+            BinaryOp::Ge => {
+                self.emit_inst(AsmInst::Slt {
+                    rd: dst,
+                    rs1: lhs,
+                    rs2: rhs,
+                });
+                self.emit_inst(AsmInst::Xori {
+                    rd: dst,
+                    rs: dst,
+                    imm: 1,
+                });
+            }
             BinaryOp::Add => self.emit_inst(AsmInst::Add {
                 rd: dst,
                 rs1: lhs,
@@ -78,6 +120,16 @@ impl<'a, W: Write> CodeGenCtx<'a, W> {
                 rs2: rhs,
             }),
             BinaryOp::Mod => self.emit_inst(AsmInst::Mod {
+                rd: dst,
+                rs1: lhs,
+                rs2: rhs,
+            }),
+            BinaryOp::And => self.emit_inst(AsmInst::And {
+                rd: dst,
+                rs1: lhs,
+                rs2: rhs,
+            }),
+            BinaryOp::Or => self.emit_inst(AsmInst::Or {
                 rd: dst,
                 rs1: lhs,
                 rs2: rhs,
@@ -138,9 +190,77 @@ impl GenerateAsm for koopa::ir::layout::BasicBlockNode {
     }
 }
 
+fn code_gen_int<W: Write>(
+    num: &koopa::ir::values::Integer,
+    ctx: &mut CodeGenCtx<'_, W>,
+) -> Option<Reg> {
+    if num.value() == 0 {
+        return Some(Reg::Zero);
+    }
+
+    let dst = ctx.acquire_any_reg();
+    ctx.emit_inst(AsmInst::Li {
+        rd: dst,
+        imm: num.value(),
+    });
+    Some(dst)
+}
+
+fn code_gen_return<W: Write>(
+    ret: &koopa::ir::values::Return,
+    ctx: &mut CodeGenCtx<'_, W>,
+) -> Option<Reg> {
+    if let Some(ret_exp_val) = ret.value() {
+        // Parse the sub-tree
+        let src_reg = ret_exp_val.generate(ctx);
+        if let Some(ret_reg) = src_reg {
+            let reg_a0 = Reg::A(0);
+            if ret_reg.xnum() != reg_a0.xnum() {
+                let a0 = ctx
+                    .acquire_reg(reg_a0)
+                    .expect("Cannot arrange a0, must have been used by others");
+                ctx.emit_inst(AsmInst::Mv {
+                    rd: a0,
+                    rs: ret_reg,
+                });
+            }
+        }
+    }
+    ctx.emit_inst(AsmInst::Ret);
+    None
+}
+
+fn code_gen_binary<W: Write>(
+    val: &koopa::ir::Value,
+    bin: &koopa::ir::values::Binary,
+    ctx: &mut CodeGenCtx<'_, W>,
+) -> Option<Reg> {
+    let lhs_reg = bin
+        .lhs()
+        .generate(ctx)
+        .expect("Binary operations require resulting register from sub-operations.");
+    let rhs_reg = bin
+        .rhs()
+        .generate(ctx)
+        .expect("Binary operations require resulting register from sub-operations.");
+
+    // Pick the destination so that we can use as least as possible.
+    let lhs_val_data = ctx.func().dfg().value(bin.lhs());
+    let rhs_val_data = ctx.func().dfg().value(bin.rhs());
+    let dst = match (lhs_val_data.kind(), rhs_val_data.kind()) {
+        (ValueKind::Integer(n), _) if n.value() != 0 => lhs_reg,
+        (_, ValueKind::Integer(n)) if n.value() != 0 => rhs_reg,
+        _ => ctx.acquire_any_reg(),
+    };
+    ctx.emit_binary(bin.op(), dst, lhs_reg, rhs_reg);
+    ctx.val_reg_dict.insert(*val, dst);
+    Some(dst)
+}
+
 // impl GenerateAsm for koopa::ir::entities::ValueData {
 impl GenerateAsm for koopa::ir::Value {
     type Return = Option<Reg>;
+
     fn generate<W: Write>(&self, ctx: &mut CodeGenCtx<'_, W>) -> Option<Reg> {
         // Check if this value is already parsed and we can then return.
         if let Some(saved_reg) = ctx.val_reg_dict.get(self) {
@@ -149,77 +269,9 @@ impl GenerateAsm for koopa::ir::Value {
 
         let val_data = ctx.func().dfg().value(*self);
         match val_data.kind() {
-            ValueKind::Integer(num) => {
-                if num.value() == 0 {
-                    return Some(Reg::Zero);
-                }
-
-                let dst = ctx.acquire_any_reg();
-                ctx.emit_inst(AsmInst::Li {
-                    rd: dst,
-                    imm: num.value(),
-                });
-                Some(dst)
-            }
-            ValueKind::Return(ret) => {
-                if let Some(ret_exp_val) = ret.value() {
-                    // Parse the sub-tree
-                    let src_reg = ret_exp_val.generate(ctx);
-                    if let Some(ret_reg) = src_reg {
-                        let reg_a0 = Reg::A(0);
-                        if ret_reg.xnum() != reg_a0.xnum() {
-                            let a0 = ctx
-                                .acquire_reg(reg_a0)
-                                .expect("Cannot arrange a0, must have been used by others");
-                            ctx.emit_inst(AsmInst::Mv {
-                                rd: a0,
-                                rs: ret_reg,
-                            });
-                        }
-                    }
-                }
-                ctx.emit_inst(AsmInst::Ret);
-                None
-            }
-            ValueKind::Binary(bin) => {
-                let lhs_reg = bin
-                    .lhs()
-                    .generate(ctx)
-                    .expect("Binary operations require resulting register from sub-operations.");
-                let rhs_reg = bin
-                    .rhs()
-                    .generate(ctx)
-                    .expect("Binary operations require resulting register from sub-operations.");
-
-                // Pick the destination so that we can use as least as possible.
-                let lhs_val_data = ctx.func().dfg().value(bin.lhs());
-                let rhs_val_data = ctx.func().dfg().value(bin.rhs());
-                let dst = match (lhs_val_data.kind(), rhs_val_data.kind()) {
-                    (ValueKind::Integer(n), _) if n.value() != 0 => lhs_reg,
-                    (_, ValueKind::Integer(n)) if n.value() != 0 => rhs_reg,
-                    _ => ctx.acquire_any_reg(),
-                };
-                ctx.emit_binary(bin.op(), dst, lhs_reg, rhs_reg);
-                // match bin.op() {
-                //     BinaryOp::Add => {
-                //         ctx.emit_binary(BinaryOp::Add, dst, lhs_reg, rhs_reg);
-                //     }
-                //     BinaryOp::Sub => {
-                //         ctx.emit_binary(BinaryOp::Sub, dst, lhs_reg, rhs_reg);
-                //     }
-                //     BinaryOp::Eq => {
-                //         ctx.emit_binary(BinaryOp::Eq, dst, lhs_reg, rhs_reg);
-                //     }
-                //     BinaryOp::Xor => {
-                //         ctx.emit_binary(BinaryOp::Xor, dst, lhs_reg, rhs_reg);
-                //     }
-                //     _ => {
-                //         unreachable!("Other operations are not yet implemetned")
-                //     }
-                // }
-                ctx.val_reg_dict.insert(*self, dst);
-                Some(dst)
-            }
+            ValueKind::Integer(num) => code_gen_int(num, ctx),
+            ValueKind::Return(ret) => code_gen_return(ret, ctx),
+            ValueKind::Binary(bin) => code_gen_binary(self, bin, ctx),
             _ => unreachable!("Not implemented yet"),
         }
     }
