@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <memory>
+#include <vector>
 
 namespace c_ast {
 
@@ -10,6 +11,8 @@ enum class MulOp { STAR, SLASH, PERCENT };
 enum class AddOp { PLUS, MINUS };
 enum class RelOp { LT, LE, GT, GE };
 enum class EqOp { EQ, NE };
+
+enum class PrimitiveType { INT };
 
 inline const char *ToString(UnaryOp op) {
   switch (op) {
@@ -66,6 +69,13 @@ inline const char *ToString(EqOp op) {
   }
 }
 
+inline const char *ToString(PrimitiveType type) {
+  switch (type) {
+  case PrimitiveType::INT:
+    return "int";
+  }
+}
+
 class BaseAST {
 public:
   virtual ~BaseAST() = default;
@@ -80,6 +90,75 @@ public:
   void Dump() const override {
     std::cout << "CompUnitAST { ";
     func_def->Dump();
+    std::cout << " }";
+  }
+};
+
+class DeclAST : public BaseAST {
+public:
+  virtual ~DeclAST() = default;
+};
+
+class DeclASTConst final : public DeclAST {
+public:
+  std::unique_ptr<BaseAST> const_decl;
+
+  void Dump() const override {
+    std::cout << "DeclAST { ";
+    const_decl->Dump();
+    std::cout << " }";
+  };
+};
+
+class ConstDeclAST final : public BaseAST {
+public:
+  std::unique_ptr<BaseAST> btype;
+  std::unique_ptr<BaseAST> const_def_primary;
+  std::vector<std::unique_ptr<BaseAST>> const_def_sub;
+
+  void Dump() const override {
+    std::cout << "ConstDeclAST { BType: ";
+    btype->Dump();
+    std::cout << " , ConstDef: ";
+    const_def_primary->Dump();
+    for (auto &const_def : this->const_def_sub) {
+      std::cout << " , ConstDef: ";
+      const_def->Dump();
+    }
+    std::cout << " }";
+  }
+};
+
+class BTypeAST final : public BaseAST {
+public:
+  PrimitiveType type;
+  void Dump() const override {
+    std::cout << "BTypeAST { ";
+    std::cout << ToString(type);
+    std::cout << " }";
+  }
+};
+
+class ConstDefAST final : public BaseAST {
+public:
+  std::string ident;
+  std::unique_ptr<BaseAST> const_init_val;
+
+  void Dump() const override {
+    std::cout << "ConstDefAST { ";
+    std::cout << "IDENT: " << ident << " , ";
+    const_init_val->Dump();
+    std::cout << " }";
+  }
+};
+
+class ConstInitValAST final : public BaseAST {
+public:
+  std::unique_ptr<BaseAST> const_exp;
+
+  void Dump() const override {
+    std::cout << "ConstInitValAST { ";
+    const_exp->Dump();
     std::cout << " }";
   }
 };
@@ -101,23 +180,56 @@ public:
 
 class FuncTypeAST : public BaseAST {
 public:
+  PrimitiveType type;
   void Dump() const override {
     std::cout << "FuncTypeAST { ";
-    std::cout << "int";
+    std::cout << ToString(this->type);
     std::cout << " }";
   }
 };
 
 class BlockAST final : public BaseAST {
 public:
-  std::unique_ptr<BaseAST> stmt;
+  std::vector<std::unique_ptr<BaseAST>> block_items;
 
   void Dump() const override {
     std::cout << "BlockAST { ";
-    stmt->Dump();
+    for (auto &bi : block_items) {
+      bi->Dump();
+      std::cout << ", ";
+    }
     std::cout << " }";
   }
 };
+
+// NOTE: We don'e really need to define BlocItemAST because we can simply just
+// have the vector being BaseAST anyway.
+// class BlockItemAST : public BaseAST {
+// public:
+//   virtual ~BlockItemAST() = default;
+// };
+
+// class BlockItemASTDecl final : public BlockItemAST {
+// public:
+//   std::unique_ptr<BaseAST> decl;
+
+//   void Dump() const override {
+//     std::cout << "BlockItemAST { Decl: ";
+//     decl->Dump();
+//     std::cout << " }";
+//   }
+// };
+
+// class BlockItemASTStmt final : public BlockItemAST {
+// public:
+//   std::unique_ptr<BaseAST> stmt;
+
+//   void Dump() const override {
+//     std::cout << "BlockItemAST { Stmt: ";
+//     stmt->Dump();
+//     std::cout << " }";
+//   }
+// };
 
 class StmtAST final : public BaseAST {
 public:
@@ -141,6 +253,15 @@ public:
   }
 };
 
+class LValAST final : public BaseAST {
+public:
+  std::string ident;
+
+  void Dump() const override {
+    std::cout << "LValAST { IDENT: " << this->ident << " }";
+  }
+};
+
 class PrimaryAST : public BaseAST {
 public:
   virtual ~PrimaryAST() = default;
@@ -156,6 +277,17 @@ public:
     std::cout << " }";
   }
 };
+
+class PrimaryASTLVal final : public PrimaryAST {
+public:
+  std::unique_ptr<BaseAST> lval;
+
+  void Dump() const override {
+    std::cout << "PrimaryAST { ";
+    lval->Dump();
+    std::cout << " }";
+  }
+}
 
 class PrimaryASTNumber final : public PrimaryAST {
 public:
@@ -384,6 +516,17 @@ public:
     std::cout << " , ";
     this->land_exp->Dump();
     std::cout << " ) }";
+  }
+};
+
+class ConstExpAST final : public BaseAST {
+public:
+  std::unique_ptr<BaseAST> exp;
+
+  void Dump() const override {
+    std::cout << "ConstExpAST { ";
+    exp->Dump();
+    std::cout << " }";
   }
 };
 
