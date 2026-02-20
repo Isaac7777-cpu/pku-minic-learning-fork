@@ -133,14 +133,15 @@ std::unique_ptr<koopa_ast::BasicBlock>
 translate_block_c_ast(const c_ast::BlockAST &block, std::string name) {
   auto ret = std::make_unique<koopa_ast::BasicBlock>(name);
 
-  auto *stmt = dynamic_cast<const c_ast::StmtAST *>(block.stmt.get());
-  if (!stmt)
-    throw std::runtime_error(
-        "ir_builder error: BlockAST expects to have StmtAST at param `stmt`");
+  // TODO: Parse with the new tree that support variable / constant declaration.
+  // auto *stmt = dynamic_cast<const c_ast::StmtAST *>(block.stmt.get());
+  // if (!stmt)
+  //   throw std::runtime_error(
+  //       "ir_builder error: BlockAST expects to have StmtAST at param `stmt`");
 
-  translate_stmt_c_ast(*stmt, *ret.get());
+  // translate_stmt_c_ast(*stmt, *ret.get());
 
-  return ret;
+  // return ret;
 }
 
 /**

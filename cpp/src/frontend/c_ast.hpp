@@ -114,14 +114,14 @@ class ConstDeclAST final : public BaseAST {
 public:
   std::unique_ptr<BaseAST> btype;
   std::unique_ptr<BaseAST> const_def_primary;
-  std::vector<std::unique_ptr<BaseAST>> const_def_sub;
+  std::vector<std::unique_ptr<BaseAST>> const_def_sup;
 
   void Dump() const override {
     std::cout << "ConstDeclAST { BType: ";
     btype->Dump();
     std::cout << " , ConstDef: ";
     const_def_primary->Dump();
-    for (auto &const_def : this->const_def_sub) {
+    for (auto &const_def : this->const_def_sup) {
       std::cout << " , ConstDef: ";
       const_def->Dump();
     }
@@ -193,43 +193,14 @@ public:
   std::vector<std::unique_ptr<BaseAST>> block_items;
 
   void Dump() const override {
-    std::cout << "BlockAST { ";
+    std::cout << "BlockAST { [ ";
     for (auto &bi : block_items) {
       bi->Dump();
       std::cout << ", ";
     }
-    std::cout << " }";
+    std::cout << " ] }";
   }
 };
-
-// NOTE: We don'e really need to define BlocItemAST because we can simply just
-// have the vector being BaseAST anyway.
-// class BlockItemAST : public BaseAST {
-// public:
-//   virtual ~BlockItemAST() = default;
-// };
-
-// class BlockItemASTDecl final : public BlockItemAST {
-// public:
-//   std::unique_ptr<BaseAST> decl;
-
-//   void Dump() const override {
-//     std::cout << "BlockItemAST { Decl: ";
-//     decl->Dump();
-//     std::cout << " }";
-//   }
-// };
-
-// class BlockItemASTStmt final : public BlockItemAST {
-// public:
-//   std::unique_ptr<BaseAST> stmt;
-
-//   void Dump() const override {
-//     std::cout << "BlockItemAST { Stmt: ";
-//     stmt->Dump();
-//     std::cout << " }";
-//   }
-// };
 
 class StmtAST final : public BaseAST {
 public:
@@ -287,7 +258,7 @@ public:
     lval->Dump();
     std::cout << " }";
   }
-}
+};
 
 class PrimaryASTNumber final : public PrimaryAST {
 public:

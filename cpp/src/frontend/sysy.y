@@ -38,7 +38,7 @@ using namespace std;
 %token <int_val> INT_CONST
 
 %type <ast_val> FuncDef FuncType Block Stmt Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp Decl ConstDecl BType ConstDef ConstInitVal BlockItem LVal ConstExp
-%type <vec> BlockItemList
+%type <vec> BlockItemList ConstDefList
 %type <int_val> Number
 %type <unary_op_val> UnaryOp
 %type <mul_op_val> MulOp
@@ -48,23 +48,77 @@ using namespace std;
 
 %destructor { delete $$; } <ast_val>
 %destructor { delete $$; } <str_val>
+%destructor { delete $$; } <vec>
 
 %%
 
 CompUnit
   : FuncDef {
     auto comp_unit = std::make_unique<c_ast::CompUnitAST>();
-    comp_unit->func_def = unique_ptr<c_ast::BaseAST>($1);
+    comp_unit->func_def = std::unique_ptr<c_ast::BaseAST>($1);
     ast = std::move(comp_unit);
+  }
+  ;
+
+Decl
+  : ConstDecl {
+    auto ast_node = new c_ast::DeclASTConst();
+    ast_node->const_decl = std::unique_ptr<c_ast::BaseAST>($1);
+    $$ = ast_node;
+  }
+  ;
+
+ConstDecl
+  : CONST BType ConstDef ConstDefList ';' {
+    auto* ast_node = new c_ast::ConstDeclAST();
+    ast_node->btype = std::unique_ptr<c_ast::BaseAST>($2);
+    ast_node->const_def_primary = std::unique_ptr<c_ast::BaseAST>($3);
+    ast_node->const_def_sup = std::move(*$4);
+    delete $4;
+    $$ = ast_node;
+  }
+  ;
+
+ConstDefList
+  : /* empty */ {
+    $$ = new std::vector<std::unique_ptr<c_ast::BaseAST>>();
+  }
+  | ConstDefList ',' ConstDef {
+    $1->push_back(std::unique_ptr<c_ast::BaseAST>($3));
+    $$ = $1;
+  }
+  ;
+
+BType
+  : INT {
+    auto* ast_node = new c_ast::BTypeAST();
+    ast_node->type = c_ast::PrimitiveType::INT;
+    $$ = ast_node;
+  }
+
+ConstDef
+  : IDENT '=' ConstInitVal {
+    auto* ast_node = new c_ast::ConstDefAST();
+    ast_node->ident = *$1; delete $1;
+    ast_node->const_init_val = std::unique_ptr<c_ast::BaseAST>($3);
+    $$ = ast_node;
+  }
+  ;
+
+ConstInitVal
+  : ConstExp {
+    auto* ast_node = new c_ast::ConstInitValAST();
+    ast_node->const_exp = std::unique_ptr<c_ast::BaseAST>($1);
+    $$ = ast_node;
   }
   ;
 
 FuncDef
   : FuncType IDENT '(' ')' Block {
     auto ast_node = new c_ast::FuncDefAST();
-    ast_node->func_type = unique_ptr<c_ast::BaseAST>($1);
+    ast_node->func_type = std::unique_ptr<c_ast::BaseAST>($1);
     ast_node->ident = *$2; delete $2;
-    ast_node->block = unique_ptr<c_ast::BaseAST>($5);
+    ast_node->block = std::unique_ptr<c_ast::BaseAST>($5);
     $$ = ast_node;
   }
   ;
@@ -88,7 +142,7 @@ Block
 
 BlockItemList
   : /* empty */ {
-    $$ = new std::vector<<std::unique_ptr<c_ast::BastAST>>();
+    $$ = new std::vector<std::unique_ptr<c_ast::BaseAST>>();
   }
   | BlockItemList BlockItem {
     $1->push_back(std::unique_ptr<c_ast::BaseAST>($2));
@@ -120,12 +174,23 @@ Exp
     $$ = ast_node;
   }
 
+LVal
+  : IDENT {
+    auto ast_node = new c_ast::LValAST();
+    ast_node->ident = *$1; delete $1;
+    $$ = ast_node;
+  }
+  ;
+
 PrimaryExp
   : '(' Exp ')' {
-    auto ast_node = new c_ast::PrimaryASTExp();
-    
+    auto* ast_node = new c_ast::PrimaryASTExp();
     ast_node->exp = std::unique_ptr<c_ast::BaseAST>($2);
-
+    $$ = ast_node;
+  }
+  | LVal {
+    auto* ast_node = new c_ast::PrimaryASTLVal();
+    ast_node->lval = std::unique_ptr<c_ast::BaseAST>($1);
     $$ = ast_node;
   }
   | Number {
@@ -137,6 +202,7 @@ PrimaryExp
 
     $$ = ast_node;
   }
+  ;
 
 Number
   : INT_CONST {
@@ -160,6 +226,7 @@ UnaryExp
 
     $$ = ast_node;
   }
+  ;
 
 MulExp
   : UnaryExp {
@@ -178,6 +245,7 @@ MulExp
 
     $$ = ast_node;
   }
+  ;
 
 AddExp
   : MulExp {
@@ -196,6 +264,7 @@ AddExp
 
     $$ = ast_node;
   }
+  ;
 
 RelExp
   : AddExp {
@@ -214,6 +283,7 @@ RelExp
 
     $$ = ast_node;
   }
+  ;
 
 EqExp
   : RelExp {
@@ -232,6 +302,7 @@ EqExp
 
     $$ = ast_node;
   }
+  ;
 
 LAndExp
   : EqExp {
@@ -249,6 +320,7 @@ LAndExp
 
     $$ = ast_node;
   }
+  ;
 
 LOrExp
   : LAndExp {
@@ -266,6 +338,14 @@ LOrExp
 
     $$ = ast_node;
   }
+  ;
+
+ConstExp
+  : Exp {
+    auto* ast_node = new c_ast::ConstExpAST();
+    ast_node->exp = std::unique_ptr<c_ast::BaseAST>($1);
+    $$ = ast_node;
+  }
 
 UnaryOp
   : '+' {
@@ -280,6 +360,7 @@ UnaryOp
   | '~' {
     $$ = c_ast::UnaryOp::TILDE;
   }
+  ;
 
 MulOp
   : '*' {
@@ -291,6 +372,7 @@ MulOp
   | '%' {
     $$ = c_ast::MulOp::PERCENT;
   }
+  ;
 
 AddOp
   : '+' {
@@ -299,6 +381,7 @@ AddOp
   | '-' {
     $$ = c_ast::AddOp::MINUS;
   }
+  ;
 
 RelOp
   : '<' {
@@ -313,6 +396,7 @@ RelOp
   | GE {
     $$ = c_ast::RelOp::GE;
   }
+  ;
 
 EqOp
   : EQ {
@@ -321,6 +405,7 @@ EqOp
   | NE {
     $$ = c_ast::EqOp::NE;
   }
+  ;
 
 %%
 
