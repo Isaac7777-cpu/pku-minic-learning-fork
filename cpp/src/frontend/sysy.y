@@ -30,13 +30,15 @@ using namespace std;
   c_ast::RelOp rel_op_val;
   c_ast::EqOp eq_op_val;
   c_ast::BaseAST *ast_val;
+  std::vector<std::unique_ptr<c_ast::BaseAST>>* vec;
 }
 
-%token INT RETURN LE GE EQ NE AND OR
+%token INT RETURN LE GE EQ NE AND OR CONST
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
-%type <ast_val> FuncDef FuncType Block Stmt Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
+%type <ast_val> FuncDef FuncType Block Stmt Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp Decl ConstDecl BType ConstDef ConstInitVal BlockItem LVal ConstExp
+%type <vec> BlockItemList
 %type <int_val> Number
 %type <unary_op_val> UnaryOp
 %type <mul_op_val> MulOp
@@ -69,16 +71,34 @@ FuncDef
 
 FuncType
   : INT {
-    $$ = new c_ast::FuncTypeAST();
+    auto* ast_node = new c_ast::FuncTypeAST();
+    ast_node->type = c_ast::PrimitiveType::INT;     // Hard code the INT type for now.
+    $$ = ast_node;
   }
   ;
 
 Block
-  : '{' Stmt '}' {
+  : '{' BlockItemList '}' {
     auto ast_node = new c_ast::BlockAST();
-    ast_node->stmt = unique_ptr<c_ast::BaseAST>($2);
+    ast_node->block_items = std::move(*$2);
+    delete $2;
     $$ = ast_node;
   }
+  ;
+
+BlockItemList
+  : /* empty */ {
+    $$ = new std::vector<<std::unique_ptr<c_ast::BastAST>>();
+  }
+  | BlockItemList BlockItem {
+    $1->push_back(std::unique_ptr<c_ast::BaseAST>($2));
+    $$ = $1;
+  }
+  ;
+
+BlockItem
+  : Decl { $$ = $1; }
+  | Stmt { $$ = $1; }
   ;
 
 Stmt
