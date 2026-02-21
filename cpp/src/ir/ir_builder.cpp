@@ -131,17 +131,20 @@ translate_func_type_c_ast(const c_ast::FuncTypeAST &func_type) {
  */
 std::unique_ptr<koopa_ast::BasicBlock>
 translate_block_c_ast(const c_ast::BlockAST &block, std::string name) {
-  auto ret = std::make_unique<koopa_ast::BasicBlock>(name);
+  auto block_koopa = std::make_unique<koopa_ast::BasicBlock>(name);
 
-  // TODO: Parse with the new tree that support variable / constant declaration.
-  // auto *stmt = dynamic_cast<const c_ast::StmtAST *>(block.stmt.get());
-  // if (!stmt)
-  //   throw std::runtime_error(
-  //       "ir_builder error: BlockAST expects to have StmtAST at param `stmt`");
-
-  // translate_stmt_c_ast(*stmt, *ret.get());
-
-  // return ret;
+  for (auto &decl_or_stmt : block.block_items) {
+    if (auto *stmt = dynamic_cast<const c_ast::StmtAST *>(decl_or_stmt.get())) {
+      translate_stmt_c_ast(*stmt, *block_koopa.get());
+    } else if (auto *decl =
+                   dynamic_cast<const c_ast::DeclAST *>(decl_or_stmt.get())) {
+      // TODO: Parse the declaration branch.
+    } else {
+      throw std::runtime_error("ir_builder error: BlockAST expects to have "
+                               "StmtAST or DeclAST in vector `block_items`");
+    }
+  }
+  return block_koopa;
 }
 
 /**
