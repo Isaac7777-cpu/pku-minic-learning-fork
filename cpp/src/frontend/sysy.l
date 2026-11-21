@@ -6,6 +6,7 @@
 
 #include <cstdlib>
 #include <string>
+#include <stdexcept>
 
 #include "sysy.tab.hpp"
 
@@ -32,7 +33,7 @@ Hexadecimal   0[xX][0-9a-fA-F]+
 "/*"                  { BEGIN(C_COMMENT); }
 <C_COMMENT>"*/"       { BEGIN(INITIAL); }
 <C_COMMENT>.|\n       { /* Ignore comment content */ }
-<C_COMMENT><<EOF>>    { /* Unterminated comment */ return 0; }
+<C_COMMENT><<EOF>>    { /* Unterminated comment */ throw std::runtime_error("Unterminated block comment"); }
 
 "int"         { return INT; }
 "return"      { return RETURN; }
