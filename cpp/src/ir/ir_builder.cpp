@@ -762,13 +762,13 @@ int32_t eval_const(const c_ast::BaseAST &node, const ConstTable &constants) {
         throw std::runtime_error(
             "ir_builder error: Division by zero in constant expression");
       }
-      return l_val / r_val;
+      return checked(l_val / r_val);
     case c_ast::MulOp::PERCENT:
       if (!r_val) {
         throw std::runtime_error(
             "ir_builder error: Modulo by zero in constant expression");
       }
-      return l_val % r_val;
+      return checked(l_val % r_val);
     }
   }
 
