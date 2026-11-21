@@ -1,4 +1,6 @@
 int main() {
-  const int x = 1 + 1;
-  return x;
+  const int a = 1 + 1;
+  const int b = a * 3, c = !(b == 6);
+
+  return 0;
 }
