@@ -56,9 +56,9 @@ int main(int argc, const char *argv[]) {
   assert(!c_parse_ret);
 
   // Output the AST (which is a string)
-  std::cout << "The C_AST: " << std::endl;
+  std::cout << "Building The C_AST...:" << std::endl;
   c_ast->Dump();
-  std::cout << std::endl << std::endl;
+  std::cout << std::endl << std::endl << "Outputing the Koopa IR..." << std::endl;
 
   // Translate to Koopa IR
   auto ret_in_koopa = convert_to_custom_koopa_from_c_reps(std::move(c_ast));
