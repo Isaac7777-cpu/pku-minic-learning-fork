@@ -8,6 +8,7 @@
 #include <limits>
 #include <stdexcept>
 #include <unordered_map>
+#include <utility>
 
 using ConstTable = std::unordered_map<std::string, int32_t>;
 
@@ -53,8 +54,10 @@ koopa_ast::Value *translate_lor_exp_c_ast(const c_ast::LOrExpAST &,
 
 /* Some helpers for implementing the Translation between C AST and Koopa */
 
-/* This function recursively evaluates the value of a  constant expression. */
-int32_t eval_const(const c_ast::BaseAST &node, const ConstTable &constants);
+/* This function recursively evaluates the value of a constant expression. */
+int32_t eval_const(const c_ast::BaseAST &, const ConstTable &);
+/* This function recursively check if all the symbols are defined. */
+void validate_const_refs(const c_ast::BaseAST &, const ConstTable &);
 
 /*******************************************************************************
  *  Implementation Details for going from each C AST nodes to Koopa Node.      *
@@ -601,6 +604,77 @@ koopa_ast::Value *translate_lor_exp_c_ast(const c_ast::LOrExpAST &lor,
 /*
  * Helpers
  */
+
+void validate_const_refs(const c_ast::BaseAST &node,
+                         const ConstTable &constants) {
+  if (dynamic_cast<const c_ast::NumberAST *>(&node))
+    return;
+
+  if (auto *p = dynamic_cast<const c_ast::LValAST *>(&node)) {
+    if (constants.find(p->ident) == constants.end()) {
+      throw std::runtime_error("Undefined constant: " + p->ident);
+    }
+    return;
+  }
+
+  auto visit = [&constants = std::as_const(constants)](
+                   const std::unique_ptr<c_ast::BaseAST> &child) {
+    validate_const_refs(*child, constants);
+  };
+
+  auto both = [&](const std::unique_ptr<c_ast::BaseAST> &lhs,
+                  const std::unique_ptr<c_ast::BaseAST> &rhs) {
+    visit(lhs);
+    visit(rhs);
+  };
+
+  // Wrappers and unary expressions.
+  if (auto *p = dynamic_cast<const c_ast::ConstInitValAST *>(&node))
+    return visit(p->const_exp);
+  if (auto *p = dynamic_cast<const c_ast::ConstExpAST *>(&node))
+    return visit(p->exp);
+  if (auto *p = dynamic_cast<const c_ast::ExpAST *>(&node))
+    return visit(p->lor_exp);
+  if (auto *p = dynamic_cast<const c_ast::PrimaryASTExp *>(&node))
+    return visit(p->exp);
+  if (auto *p = dynamic_cast<const c_ast::PrimaryASTLVal *>(&node))
+    return visit(p->lval);
+  if (auto *p = dynamic_cast<const c_ast::PrimaryASTNumber *>(&node))
+    return visit(p->number);
+  if (auto *p = dynamic_cast<const c_ast::UnaryExpASTPrimary *>(&node))
+    return visit(p->primary_exp);
+  if (auto *p = dynamic_cast<const c_ast::UnaryExpASTOpUnary *>(&node))
+    return visit(p->unary_exp);
+  if (auto *p = dynamic_cast<const c_ast::MulExpASTUnary *>(&node))
+    return visit(p->unary_exp);
+  if (auto *p = dynamic_cast<const c_ast::AddExpASTMul *>(&node))
+    return visit(p->mul_exp);
+  if (auto *p = dynamic_cast<const c_ast::RelExpASTAdd *>(&node))
+    return visit(p->add_exp);
+  if (auto *p = dynamic_cast<const c_ast::EqExpASTRel *>(&node))
+    return visit(p->rel_exp);
+  if (auto *p = dynamic_cast<const c_ast::LAndExpASTEq *>(&node))
+    return visit(p->eq_exp);
+  if (auto *p = dynamic_cast<const c_ast::LOrExpASTLAnd *>(&node))
+    return visit(p->land_exp);
+
+  // Binary expressions: always inspect both children.
+  if (auto *p = dynamic_cast<const c_ast::MulExpASTMulUnary *>(&node))
+    return both(p->mul_exp, p->unary_exp);
+  if (auto *p = dynamic_cast<const c_ast::AddExpASTAddMul *>(&node))
+    return both(p->add_exp, p->mul_exp);
+  if (auto *p = dynamic_cast<const c_ast::RelExpASTRelOpAdd *>(&node))
+    return both(p->rel_exp, p->add_exp);
+  if (auto *p = dynamic_cast<const c_ast::EqExpASTEqOpRel *>(&node))
+    return both(p->eq_exp, p->rel_exp);
+  if (auto *p = dynamic_cast<const c_ast::LAndExpASTLAndEq *>(&node))
+    return both(p->land_exp, p->eq_exp);
+  if (auto *p = dynamic_cast<const c_ast::LOrExpASTLOrLAnd *>(&node))
+    return both(p->lor_exp, p->land_exp);
+
+  throw std::runtime_error("Unsupported expression node");
+}
+
 int32_t eval_const(const c_ast::BaseAST &node, const ConstTable &constants) {
   // Calculate arithmetic. First in 64 bits then convert to 32.
   auto checked = [](int64_t val) -> int32_t {
