@@ -4,7 +4,12 @@
 
 #include "frontend/c_ast.hpp"
 #include "koopa_ast.hpp"
+#include <cstdint>
+#include <limits>
 #include <stdexcept>
+#include <unordered_map>
+
+using ConstTable = std::unordered_map<std::string, int32_t>;
 
 std::unique_ptr<koopa_ast::Program>
 translate_comp_unit_c_ast(const c_ast::CompUnitAST &);
@@ -14,8 +19,8 @@ std::unique_ptr<koopa_ast::Type>
 translate_func_type_c_ast(const c_ast::FuncTypeAST &);
 std::unique_ptr<koopa_ast::BasicBlock>
 translate_block_c_ast(const c_ast::BlockAST &block, std::string = "");
-koopa_ast::Value *translate_stmt_c_ast(const c_ast::StmtAST &,
-                                       koopa_ast::BasicBlock &);
+void translate_stmt_c_ast(const c_ast::StmtAST &, koopa_ast::BasicBlock &,
+                          const ConstTable &constants);
 koopa_ast::Value *translate_exp_c_ast(const c_ast::ExpAST &,
                                       koopa_ast::BasicBlock &);
 koopa_ast::Value *translate_primary_exp_c_ast(const c_ast::PrimaryAST &,
@@ -36,6 +41,11 @@ koopa_ast::Value *translate_land_exp_c_ast(const c_ast::LAndExpAST &,
                                            koopa_ast::BasicBlock &);
 koopa_ast::Value *translate_lor_exp_c_ast(const c_ast::LOrExpAST &,
                                           koopa_ast::BasicBlock &);
+
+/* Some helpers for implementing the Translation between C AST and Koopa */
+
+/* This function recursively evaluates the value of a  constant expression. */
+int32_t eval_const(const c_ast::BaseAST &node, const ConstTable &constants);
 
 /*******************************************************************************
  *  Implementation Details for going from each C AST nodes to Koopa Node.      *
@@ -124,6 +134,22 @@ translate_func_type_c_ast(const c_ast::FuncTypeAST &func_type) {
   return std::make_unique<koopa_ast::Type>(koopa_ast::Type::I32());
 }
 
+void define_constant(const c_ast::BaseAST &node, ConstTable &constants) {
+  ;
+  if (auto *def = dynamic_cast<const c_ast::ConstDefAST *>(&node)) {
+    if (constants.count(def->ident)) {
+      throw std::runtime_error("ir_builder error: Duplicate constant of name " +
+                               def->ident);
+    }
+
+    // Perform compile-time evaluation
+    int32_t value = eval_const(*def->const_init_val, constants);
+    constants.emplace(def->ident, value);
+  } else {
+    throw std::runtime_error("Expected ConstDefAST");
+  }
+}
+
 /**
  * Converting a Block C AST to koopa Block for now.
  *
@@ -133,12 +159,29 @@ std::unique_ptr<koopa_ast::BasicBlock>
 translate_block_c_ast(const c_ast::BlockAST &block, std::string name) {
   auto block_koopa = std::make_unique<koopa_ast::BasicBlock>(name);
 
+  // TODO: Sufficient for the single function block supported at this stage.
+  ConstTable constants;
+
   for (auto &decl_or_stmt : block.block_items) {
     if (auto *stmt = dynamic_cast<const c_ast::StmtAST *>(decl_or_stmt.get())) {
-      translate_stmt_c_ast(*stmt, *block_koopa.get());
-    } else if (auto *decl =
-                   dynamic_cast<const c_ast::DeclAST *>(decl_or_stmt.get())) {
-      // TODO: Parse the declaration branch.
+      translate_stmt_c_ast(*stmt, *block_koopa, constants);
+    } else if (auto *decl = dynamic_cast<const c_ast::DeclASTConst *>(
+                   decl_or_stmt.get())) {
+      auto *const_decl =
+          dynamic_cast<const c_ast::ConstDeclAST *>(decl->const_decl.get());
+      if (!const_decl) {
+        throw std::runtime_error("ir_builder error: DeclASTConst expects "
+                                 "ConstDeclAST in `const_decl`");
+      }
+
+      // const int a = 2, b = a + 3, c = b * 4;
+      //           ^ first definition
+      define_constant(*const_decl->const_def_primary, constants);
+
+      //                  ^ remaining definitions, in order
+      for (const auto &def : const_decl->const_def_sup) {
+        define_constant(*def, constants);
+      }
     } else {
       throw std::runtime_error("ir_builder error: BlockAST expects to have "
                                "StmtAST or DeclAST in vector `block_items`");
@@ -151,8 +194,9 @@ translate_block_c_ast(const c_ast::BlockAST &block, std::string name) {
  * Going from StmtAST to koopa stmt
  *
  */
-koopa_ast::Value *translate_stmt_c_ast(const c_ast::StmtAST &stmt,
-                                       koopa_ast::BasicBlock &block) {
+void translate_stmt_c_ast(const c_ast::StmtAST &stmt,
+                          koopa_ast::BasicBlock &block,
+                          const ConstTable &constants) {
   // Cast and check that it has the correct type
   auto *exp = dynamic_cast<const c_ast::ExpAST *>(stmt.exp.get());
   if (!exp)
@@ -162,7 +206,8 @@ koopa_ast::Value *translate_stmt_c_ast(const c_ast::StmtAST &stmt,
   // Translate the expression inside the return
   auto *val = translate_exp_c_ast(*exp, block);
 
-  return block.Make<koopa_ast::Return>(true, val);
+  // Only needs to emit the IR instruction, no need to return the pointer.
+  block.Make<koopa_ast::Return>(true, val);
 }
 
 /**
@@ -524,6 +569,157 @@ koopa_ast::Value *translate_lor_exp_c_ast(const c_ast::LOrExpAST &lor,
         "ir_builder error: LOrExpAST must have one of the following "
         "implementation: {LOrExpASTLAnd, LOrExpASTLOrLAnd}");
   }
+}
+
+/*
+ * Helpers
+ */
+int32_t eval_const(const c_ast::BaseAST &node, const ConstTable &constants) {
+  // Calculate arithmetic. First in 64 bits then convert to 32.
+  auto checked = [](int64_t val) -> int32_t {
+    if (val < std::numeric_limits<int32_t>::min() ||
+        val > std::numeric_limits<int32_t>::max()) {
+      throw std::runtime_error(
+          "ir_builder error: Constant expression overflows int32");
+    }
+    return static_cast<int32_t>(val);
+  };
+
+  // Leaves: return the value, but there are two cases.
+  // 1. Literal, just return the value represented by that
+  // 2. A left value, then obtain the value if it is constant (which should
+  // exist in the constants table). If it is not a constant, throw an error.
+  if (auto *p = dynamic_cast<const c_ast::NumberAST *>(&node)) {
+    return p->int_val;
+  }
+
+  if (auto *p = dynamic_cast<const c_ast::LValAST *>(&node)) {
+    auto it = constants.find(p->ident);
+    if (it == constants.end()) {
+      throw std::runtime_error(
+          "ir_builder error: Undefined constant with name: `" + p->ident + "`");
+    }
+
+    return it->second;
+  }
+
+  // Non-leave: Evaluate the children, again two types:
+  // 1. Just wrappers -> return the value without any operations
+  // 2. Actual arithmetic nodes -> compute the values using the child
+  if (auto *p = dynamic_cast<const c_ast::ConstInitValAST *>(&node)) {
+    return eval_const(*p->const_exp, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::ConstExpAST *>(&node)) {
+    return eval_const(*p->exp, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::ExpAST *>(&node)) {
+    return eval_const(*p->lor_exp, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::PrimaryASTExp *>(&node)) {
+    return eval_const(*p->exp, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::PrimaryASTLVal *>(&node)) {
+    return eval_const(*p->lval, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::PrimaryASTNumber *>(&node)) {
+    return eval_const(*p->number, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::UnaryExpASTPrimary *>(&node)) {
+    return eval_const(*p->primary_exp, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::MulExpASTUnary *>(&node)) {
+    return eval_const(*p->unary_exp, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::AddExpASTMul *>(&node)) {
+    return eval_const(*p->mul_exp, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::RelExpASTAdd *>(&node)) {
+    return eval_const(*p->add_exp, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::EqExpASTRel *>(&node)) {
+    return eval_const(*p->rel_exp, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::LAndExpASTEq *>(&node)) {
+    return eval_const(*p->eq_exp, constants);
+  } else if (auto *p = dynamic_cast<const c_ast::LOrExpASTLAnd *>(&node)) {
+    return eval_const(*p->land_exp, constants);
+  }
+
+  if (auto *p = dynamic_cast<const c_ast::UnaryExpASTOpUnary *>(&node)) {
+    int32_t val = eval_const(*p->unary_exp, constants);
+
+    switch (p->unary_op) {
+    case c_ast::UnaryOp::PLUS:
+      return val;
+    case c_ast::UnaryOp::TILDE:
+      return ~val;
+    case c_ast::UnaryOp::BANG:
+      return !val;
+    case c_ast::UnaryOp::MINUS:
+      return checked(-int64_t(val));
+    }
+  }
+
+  if (auto *p = dynamic_cast<const c_ast::MulExpASTMulUnary *>(&node)) {
+    int64_t l_val = eval_const(*p->mul_exp, constants);
+    int64_t r_val = eval_const(*p->unary_exp, constants);
+
+    switch (p->mul_op) {
+    case c_ast::MulOp::STAR:
+      return checked(l_val * r_val);
+    case c_ast::MulOp::SLASH:
+      if (!r_val) {
+        throw std::runtime_error(
+            "ir_builder error: Division by zero in constant expression");
+      }
+      return l_val / r_val;
+    case c_ast::MulOp::PERCENT:
+      if (!r_val) {
+        throw std::runtime_error(
+            "ir_builder error: Modulo by zero in constant expression");
+      }
+      return l_val % r_val;
+    }
+  }
+
+  if (auto *p = dynamic_cast<const c_ast::AddExpASTAddMul *>(&node)) {
+    int64_t l_val = eval_const(*p->add_exp, constants);
+    int64_t r_val = eval_const(*p->mul_exp, constants);
+
+    switch (p->add_op) {
+    case c_ast::AddOp::PLUS:
+      return checked(l_val + r_val);
+    case c_ast::AddOp::MINUS:
+      return checked(l_val - r_val);
+    }
+  }
+
+  if (auto *p = dynamic_cast<const c_ast::RelExpASTRelOpAdd *>(&node)) {
+    int32_t l_val = eval_const(*p->rel_exp, constants);
+    int32_t r_val = eval_const(*p->add_exp, constants);
+
+    switch (p->rel_op) {
+    case c_ast::RelOp::GE:
+      return l_val >= r_val;
+    case c_ast::RelOp::LE:
+      return l_val <= r_val;
+    case c_ast::RelOp::GT:
+      return l_val > r_val;
+    case c_ast::RelOp::LT:
+      return l_val < r_val;
+    }
+  }
+
+  if (auto *p = dynamic_cast<const c_ast::EqExpASTEqOpRel *>(&node)) {
+    int32_t l_val = eval_const(*p->eq_exp, constants);
+    int32_t r_val = eval_const(*p->rel_exp, constants);
+
+    switch (p->eq_op) {
+    case c_ast::EqOp::EQ:
+      return l_val == r_val;
+    case c_ast::EqOp::NE:
+      return l_val != r_val;
+    }
+  }
+
+  if (auto *p = dynamic_cast<const c_ast::LAndExpASTLAndEq *>(&node))
+    return eval_const(*p->land_exp, constants) &&
+           eval_const(*p->eq_exp, constants);
+
+  if (auto *p = dynamic_cast<const c_ast::LOrExpASTLOrLAnd *>(&node))
+    return eval_const(*p->lor_exp, constants) ||
+           eval_const(*p->land_exp, constants);
+
+  throw std::runtime_error("Unsupported AST node in constant expression");
 }
 
 /*******************************************************************************
