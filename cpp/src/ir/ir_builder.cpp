@@ -174,6 +174,8 @@ translate_block_c_ast(const c_ast::BlockAST &block, std::string name) {
   for (auto &decl_or_stmt : block.block_items) {
     if (auto *stmt = dynamic_cast<const c_ast::StmtAST *>(decl_or_stmt.get())) {
       translate_stmt_c_ast(*stmt, *block_koopa, constants);
+      // WARNING: This should be handled better when there are many other statements
+      break;
     } else if (auto *decl = dynamic_cast<const c_ast::DeclASTConst *>(
                    decl_or_stmt.get())) {
       auto *const_decl =
@@ -186,7 +188,7 @@ translate_block_c_ast(const c_ast::BlockAST &block, std::string name) {
       // const int a = 2, b = a + 3, c = b * 4;
       //           ^ first definition
       define_constant(*const_decl->const_def_primary, constants);
-
+      // const int a = 2, b = a + 3, c = b * 4;
       //                  ^ remaining definitions, in order
       for (const auto &def : const_decl->const_def_sup) {
         define_constant(*def, constants);

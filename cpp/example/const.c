@@ -3,4 +3,5 @@ int main() {
   const int b = a * 3, c = !(b == 6);
 
   return a;
+  return c;
 }
