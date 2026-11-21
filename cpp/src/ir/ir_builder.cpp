@@ -738,13 +738,17 @@ int32_t eval_const(const c_ast::BaseAST &node, const ConstTable &constants) {
     }
   }
 
-  if (auto *p = dynamic_cast<const c_ast::LAndExpASTLAndEq *>(&node))
-    return eval_const(*p->land_exp, constants) &&
-           eval_const(*p->eq_exp, constants);
+  if (auto *p = dynamic_cast<const c_ast::LAndExpASTLAndEq *>(&node)) {
+    int32_t l_val = eval_const(*p->land_exp, constants);
+    int32_t r_val = eval_const(*p->eq_exp, constants);
+    return l_val && r_val;
+  }
 
-  if (auto *p = dynamic_cast<const c_ast::LOrExpASTLOrLAnd *>(&node))
-    return eval_const(*p->lor_exp, constants) ||
-           eval_const(*p->land_exp, constants);
+  if (auto *p = dynamic_cast<const c_ast::LOrExpASTLOrLAnd *>(&node)) {
+    int32_t l_val = eval_const(*p->lor_exp, constants);
+    int32_t r_val = eval_const(*p->land_exp, constants);
+    return l_val || r_val;
+  }
 
   throw std::runtime_error("Unsupported AST node in constant expression");
 }
