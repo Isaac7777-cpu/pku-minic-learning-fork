@@ -18,29 +18,38 @@ translate_func_def_c_ast(const c_ast::FuncDefAST &);
 std::unique_ptr<koopa_ast::Type>
 translate_func_type_c_ast(const c_ast::FuncTypeAST &);
 std::unique_ptr<koopa_ast::BasicBlock>
-translate_block_c_ast(const c_ast::BlockAST &block, std::string = "");
+translate_block_c_ast(const c_ast::BlockAST &, std::string = "");
 void translate_stmt_c_ast(const c_ast::StmtAST &, koopa_ast::BasicBlock &,
-                          const ConstTable &constants);
+                          const ConstTable &);
 koopa_ast::Value *translate_exp_c_ast(const c_ast::ExpAST &,
-                                      koopa_ast::BasicBlock &);
+                                      koopa_ast::BasicBlock &,
+                                      const ConstTable &);
 koopa_ast::Value *translate_primary_exp_c_ast(const c_ast::PrimaryAST &,
-                                              koopa_ast::BasicBlock &);
+                                              koopa_ast::BasicBlock &,
+                                              const ConstTable &);
 koopa_ast::Integer *translate_number_c_ast(const c_ast::NumberAST &,
                                            koopa_ast::BasicBlock &);
 koopa_ast::Value *translate_unary_exp_c_ast(const c_ast::UnaryExpAST &,
-                                            koopa_ast::BasicBlock &);
+                                            koopa_ast::BasicBlock &,
+                                            const ConstTable &);
 koopa_ast::Value *translate_mul_exp_c_ast(const c_ast::MulExpAST &,
-                                          koopa_ast::BasicBlock &);
+                                          koopa_ast::BasicBlock &,
+                                          const ConstTable &);
 koopa_ast::Value *translate_add_exp_c_ast(const c_ast::AddExpAST &,
-                                          koopa_ast::BasicBlock &);
+                                          koopa_ast::BasicBlock &,
+                                          const ConstTable &);
 koopa_ast::Value *translate_rel_exp_c_ast(const c_ast::RelExpAST &,
-                                          koopa_ast::BasicBlock &);
+                                          koopa_ast::BasicBlock &,
+                                          const ConstTable &);
 koopa_ast::Value *translate_eq_exp_c_ast(const c_ast::EqExpAST &,
-                                         koopa_ast::BasicBlock &);
+                                         koopa_ast::BasicBlock &,
+                                         const ConstTable &);
 koopa_ast::Value *translate_land_exp_c_ast(const c_ast::LAndExpAST &,
-                                           koopa_ast::BasicBlock &);
+                                           koopa_ast::BasicBlock &,
+                                           const ConstTable &);
 koopa_ast::Value *translate_lor_exp_c_ast(const c_ast::LOrExpAST &,
-                                          koopa_ast::BasicBlock &);
+                                          koopa_ast::BasicBlock &,
+                                          const ConstTable &);
 
 /* Some helpers for implementing the Translation between C AST and Koopa */
 
@@ -204,7 +213,7 @@ void translate_stmt_c_ast(const c_ast::StmtAST &stmt,
         "ir_builder error: StmtAST expects ExpAST at param `exp`");
 
   // Translate the expression inside the return
-  auto *val = translate_exp_c_ast(*exp, block);
+  auto *val = translate_exp_c_ast(*exp, block, constants);
 
   // Only needs to emit the IR instruction, no need to return the pointer.
   block.Make<koopa_ast::Return>(true, val);
@@ -214,26 +223,28 @@ void translate_stmt_c_ast(const c_ast::StmtAST &stmt,
  * Converting a Exp C AST to koopa
  */
 koopa_ast::Value *translate_exp_c_ast(const c_ast::ExpAST &exp,
-                                      koopa_ast::BasicBlock &block) {
+                                      koopa_ast::BasicBlock &block,
+                                      const ConstTable &constants) {
   auto *lor_exp = dynamic_cast<const c_ast::LOrExpAST *>(exp.lor_exp.get());
   if (!lor_exp)
     throw std::runtime_error(
         "ir_builder error: ExpAST expects AddExpAST at param `add_exp`");
-  return translate_lor_exp_c_ast(*lor_exp, block);
+  return translate_lor_exp_c_ast(*lor_exp, block, constants);
 }
 
 /**
  * Converting a PrimaryExp in C AST to koopa
  */
 koopa_ast::Value *translate_primary_exp_c_ast(const c_ast::PrimaryAST &primary,
-                                              koopa_ast::BasicBlock &block) {
+                                              koopa_ast::BasicBlock &block,
+                                              const ConstTable &constants) {
   if (auto *p = dynamic_cast<const c_ast::PrimaryASTExp *>(&primary)) {
     auto *exp = dynamic_cast<const c_ast::ExpAST *>(p->exp.get());
     if (!exp)
       throw std::runtime_error("ir_builder error: PrimaryASTExp expects "
                                "ExpAST at param `exp`");
 
-    return translate_exp_c_ast(*exp, block);
+    return translate_exp_c_ast(*exp, block, constants);
   } else if (auto *p_num =
                  dynamic_cast<const c_ast::PrimaryASTNumber *>(&primary)) {
     auto *num = dynamic_cast<const c_ast::NumberAST *>(p_num->number.get());
@@ -242,6 +253,14 @@ koopa_ast::Value *translate_primary_exp_c_ast(const c_ast::PrimaryAST &primary,
           "ir_builder error: PrimaryASTNumber expects NumberAST at param "
           "`number`");
     return block.Make<koopa_ast::Integer>(false, num->int_val);
+  } else if (auto *p = dynamic_cast<const c_ast::PrimaryASTLVal *>(&primary)) {
+    auto *lval = dynamic_cast<const c_ast::LValAST *>(p->lval.get());
+    if (!lval)
+      throw std::runtime_error(
+          "ir_builder error: PrimaryASTLVal expects LValAST at param `lval`");
+
+    int32_t val = eval_const(*lval, constants);
+    return block.Make<koopa_ast::Integer>(false, val);
   } else {
     throw std::runtime_error(
         "ir_builder error: PrimaryAST must have one of the following "
@@ -260,7 +279,8 @@ koopa_ast::Integer *translate_number_c_ast(const c_ast::NumberAST &number,
 }
 
 koopa_ast::Value *translate_unary_exp_c_ast(const c_ast::UnaryExpAST &unary,
-                                            koopa_ast::BasicBlock &block) {
+                                            koopa_ast::BasicBlock &block,
+                                            const ConstTable &constants) {
 
   if (auto *p = dynamic_cast<const c_ast::UnaryExpASTPrimary *>(&unary)) {
 
@@ -268,7 +288,7 @@ koopa_ast::Value *translate_unary_exp_c_ast(const c_ast::UnaryExpAST &unary,
     if (!prim)
       throw std::runtime_error("ir_builder error: UnaryExpASTPrimary expects "
                                "PrimaryAST at param `primary_exp`");
-    return translate_primary_exp_c_ast(*prim, block);
+    return translate_primary_exp_c_ast(*prim, block, constants);
   } else if (auto *op =
                  dynamic_cast<const c_ast::UnaryExpASTOpUnary *>(&unary)) {
 
@@ -278,7 +298,7 @@ koopa_ast::Value *translate_unary_exp_c_ast(const c_ast::UnaryExpAST &unary,
       throw std::runtime_error("ir_builder error: UnaryExpASTOpUnary expects "
                                "UnaryExpAST at param `unary_exp`");
 
-    auto *u_exp_ast = translate_unary_exp_c_ast(*u_exp, block);
+    auto *u_exp_ast = translate_unary_exp_c_ast(*u_exp, block, constants);
 
     // Generate the instruction based on the operation type
     switch (op->unary_op) {
@@ -316,14 +336,15 @@ koopa_ast::Value *translate_unary_exp_c_ast(const c_ast::UnaryExpAST &unary,
 }
 
 koopa_ast::Value *translate_mul_exp_c_ast(const c_ast::MulExpAST &mul,
-                                          koopa_ast::BasicBlock &block) {
+                                          koopa_ast::BasicBlock &block,
+                                          const ConstTable &constants) {
 
   if (auto *p = dynamic_cast<const c_ast::MulExpASTUnary *>(&mul)) {
     auto *unary = dynamic_cast<const c_ast::UnaryExpAST *>(p->unary_exp.get());
     if (!unary)
       throw std::runtime_error("ir_builder error: MulExpASTUnary expects "
                                "UnaryAST at param `unary_exp`");
-    return translate_unary_exp_c_ast(*unary, block);
+    return translate_unary_exp_c_ast(*unary, block, constants);
   } else if (auto *p = dynamic_cast<const c_ast::MulExpASTMulUnary *>(&mul)) {
 
     // Obtain the sub-node
@@ -338,8 +359,9 @@ koopa_ast::Value *translate_mul_exp_c_ast(const c_ast::MulExpAST &mul,
                                "UnaryAST at param `unary_exp`");
 
     // Recursively parse the tree
-    auto *mul_exp_ast = translate_mul_exp_c_ast(*mul_exp, block);
-    auto *unary_exp_ast = translate_unary_exp_c_ast(*unary_exp, block);
+    auto *mul_exp_ast = translate_mul_exp_c_ast(*mul_exp, block, constants);
+    auto *unary_exp_ast =
+        translate_unary_exp_c_ast(*unary_exp, block, constants);
 
     // Build the instruction in koopa
     switch (p->mul_op) {
@@ -364,14 +386,15 @@ koopa_ast::Value *translate_mul_exp_c_ast(const c_ast::MulExpAST &mul,
 }
 
 koopa_ast::Value *translate_add_exp_c_ast(const c_ast::AddExpAST &add,
-                                          koopa_ast::BasicBlock &block) {
+                                          koopa_ast::BasicBlock &block,
+                                          const ConstTable &constants) {
   if (auto *p = dynamic_cast<const c_ast::AddExpASTMul *>(&add)) {
     auto *mul_exp = dynamic_cast<const c_ast::MulExpAST *>(p->mul_exp.get());
     if (!mul_exp)
       throw std::runtime_error("ir_builder error: AddExpASTMul expects "
                                "MulExpAST at param `mul_exp`");
 
-    return translate_mul_exp_c_ast(*mul_exp, block);
+    return translate_mul_exp_c_ast(*mul_exp, block, constants);
   } else if (auto *p = dynamic_cast<const c_ast::AddExpASTAddMul *>(&add)) {
     // Obtain the sub-node
     auto *add_exp = dynamic_cast<const c_ast::AddExpAST *>(p->add_exp.get());
@@ -384,8 +407,8 @@ koopa_ast::Value *translate_add_exp_c_ast(const c_ast::AddExpAST &add,
                                "MulExpAST at param `mul_exp`");
 
     // Recursively parse the tree
-    auto *add_exp_ast = translate_add_exp_c_ast(*add_exp, block);
-    auto *mul_exp_ast = translate_mul_exp_c_ast(*mul_exp, block);
+    auto *add_exp_ast = translate_add_exp_c_ast(*add_exp, block, constants);
+    auto *mul_exp_ast = translate_mul_exp_c_ast(*mul_exp, block, constants);
 
     // Build the instruction in koopa
     switch (p->add_op) {
@@ -404,14 +427,15 @@ koopa_ast::Value *translate_add_exp_c_ast(const c_ast::AddExpAST &add,
 }
 
 koopa_ast::Value *translate_rel_exp_c_ast(const c_ast::RelExpAST &rel,
-                                          koopa_ast::BasicBlock &block) {
+                                          koopa_ast::BasicBlock &block,
+                                          const ConstTable &constants) {
   if (auto *p = dynamic_cast<const c_ast::RelExpASTAdd *>(&rel)) {
     auto *add_exp = dynamic_cast<const c_ast::AddExpAST *>(p->add_exp.get());
     if (!add_exp) {
       throw std::runtime_error("ir_builder error: RelExpASTAdd expects "
                                "AddExpAST at param `add_exp`");
     }
-    return translate_add_exp_c_ast(*add_exp, block);
+    return translate_add_exp_c_ast(*add_exp, block, constants);
   } else if (auto *p = dynamic_cast<const c_ast::RelExpASTRelOpAdd *>(&rel)) {
     // Obtain the subnode
     auto *rel_exp = dynamic_cast<const c_ast::RelExpAST *>(p->rel_exp.get());
@@ -426,8 +450,8 @@ koopa_ast::Value *translate_rel_exp_c_ast(const c_ast::RelExpAST &rel,
     }
 
     // Recursively parse the tree
-    auto *rel_exp_ast = translate_rel_exp_c_ast(*rel_exp, block);
-    auto *add_exp_ast = translate_add_exp_c_ast(*add_exp, block);
+    auto *rel_exp_ast = translate_rel_exp_c_ast(*rel_exp, block, constants);
+    auto *add_exp_ast = translate_add_exp_c_ast(*add_exp, block, constants);
 
     switch (p->rel_op) {
     case c_ast::RelOp::LT:
@@ -451,14 +475,15 @@ koopa_ast::Value *translate_rel_exp_c_ast(const c_ast::RelExpAST &rel,
 }
 
 koopa_ast::Value *translate_eq_exp_c_ast(const c_ast::EqExpAST &eq,
-                                         koopa_ast::BasicBlock &block) {
+                                         koopa_ast::BasicBlock &block,
+                                         const ConstTable &constants) {
   if (auto *p = dynamic_cast<const c_ast::EqExpASTRel *>(&eq)) {
     auto *rel_exp = dynamic_cast<const c_ast::RelExpAST *>(p->rel_exp.get());
     if (!rel_exp) {
       throw std::runtime_error("ir_builder error: EqExpASTRel expects "
                                "RelExpAST at param `rel_exp`");
     }
-    return translate_rel_exp_c_ast(*rel_exp, block);
+    return translate_rel_exp_c_ast(*rel_exp, block, constants);
   } else if (auto *p = dynamic_cast<const c_ast::EqExpASTEqOpRel *>(&eq)) {
     // Obtain the subnode
     auto *eq_exp = dynamic_cast<const c_ast::EqExpAST *>(p->eq_exp.get());
@@ -473,8 +498,8 @@ koopa_ast::Value *translate_eq_exp_c_ast(const c_ast::EqExpAST &eq,
     }
 
     // Recursively parse the tree
-    auto *eq_exp_ast = translate_eq_exp_c_ast(*eq_exp, block);
-    auto *rel_exp_ast = translate_rel_exp_c_ast(*rel_exp, block);
+    auto *eq_exp_ast = translate_eq_exp_c_ast(*eq_exp, block, constants);
+    auto *rel_exp_ast = translate_rel_exp_c_ast(*rel_exp, block, constants);
 
     switch (p->eq_op) {
     case c_ast::EqOp::EQ:
@@ -492,14 +517,15 @@ koopa_ast::Value *translate_eq_exp_c_ast(const c_ast::EqExpAST &eq,
 }
 
 koopa_ast::Value *translate_land_exp_c_ast(const c_ast::LAndExpAST &land,
-                                           koopa_ast::BasicBlock &block) {
+                                           koopa_ast::BasicBlock &block,
+                                           const ConstTable &constants) {
   if (auto *p = dynamic_cast<const c_ast::LAndExpASTEq *>(&land)) {
     auto *eq_exp = dynamic_cast<const c_ast::EqExpAST *>(p->eq_exp.get());
     if (!eq_exp) {
       throw std::runtime_error(
           "ir_builder error: LAndExpASTEq expects EqExpAST at param `eq_exp`");
     }
-    return translate_eq_exp_c_ast(*eq_exp, block);
+    return translate_eq_exp_c_ast(*eq_exp, block, constants);
   } else if (auto *p = dynamic_cast<const c_ast::LAndExpASTLAndEq *>(&land)) {
     auto *land_exp = dynamic_cast<const c_ast::LAndExpAST *>(p->land_exp.get());
     if (!land_exp) {
@@ -513,8 +539,8 @@ koopa_ast::Value *translate_land_exp_c_ast(const c_ast::LAndExpAST &land,
     }
 
     // Recursively parsing
-    auto *land_exp_ast = translate_land_exp_c_ast(*land_exp, block);
-    auto *eq_exp_ast = translate_eq_exp_c_ast(*eq_exp, block);
+    auto *land_exp_ast = translate_land_exp_c_ast(*land_exp, block, constants);
+    auto *eq_exp_ast = translate_eq_exp_c_ast(*eq_exp, block, constants);
 
     // Build the instruction in koopa
     auto *zero = block.Make<koopa_ast::Integer>(false, 0);
@@ -532,14 +558,15 @@ koopa_ast::Value *translate_land_exp_c_ast(const c_ast::LAndExpAST &land,
 }
 
 koopa_ast::Value *translate_lor_exp_c_ast(const c_ast::LOrExpAST &lor,
-                                          koopa_ast::BasicBlock &block) {
+                                          koopa_ast::BasicBlock &block,
+                                          const ConstTable &constants) {
   if (auto *p = dynamic_cast<const c_ast::LOrExpASTLAnd *>(&lor)) {
     auto *land_exp = dynamic_cast<const c_ast::LAndExpAST *>(p->land_exp.get());
     if (!land_exp) {
       throw std::runtime_error("ir_builder error: LOrExpASTLAnd expects "
                                "LAndExpAST at param `land_exp`");
     }
-    return translate_land_exp_c_ast(*land_exp, block);
+    return translate_land_exp_c_ast(*land_exp, block, constants);
   } else if (auto *p = dynamic_cast<const c_ast::LOrExpASTLOrLAnd *>(&lor)) {
     auto *lor_exp = dynamic_cast<const c_ast::LOrExpAST *>(p->lor_exp.get());
     if (!lor_exp) {
@@ -553,8 +580,8 @@ koopa_ast::Value *translate_lor_exp_c_ast(const c_ast::LOrExpAST &lor,
     }
 
     // Recursive parse
-    auto *lor_exp_ast = translate_lor_exp_c_ast(*lor_exp, block);
-    auto *land_exp_ast = translate_land_exp_c_ast(*land_exp, block);
+    auto *lor_exp_ast = translate_lor_exp_c_ast(*lor_exp, block, constants);
+    auto *land_exp_ast = translate_land_exp_c_ast(*land_exp, block, constants);
 
     // Build the instruction
     auto *zero = block.Make<koopa_ast::Integer>(false, 0);
