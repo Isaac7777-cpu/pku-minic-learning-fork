@@ -37,8 +37,8 @@ using namespace std;
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
-%type <ast_val> FuncDef FuncType Block Stmt Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp Decl ConstDecl BType ConstDef ConstInitVal BlockItem LVal ConstExp
-%type <vec> BlockItemList ConstDefList
+%type <ast_val> FuncDef FuncType Block Stmt Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp Decl ConstDecl BType ConstDef ConstInitVal BlockItem LVal ConstExp VarDecl VarDef InitVal
+%type <vec> BlockItemList ConstDefList VarDefList
 %type <int_val> Number
 %type <unary_op_val> UnaryOp
 %type <mul_op_val> MulOp
@@ -66,6 +66,19 @@ Decl
     ast_node->const_decl = std::unique_ptr<c_ast::BaseAST>($1);
     $$ = ast_node;
   }
+  | VarDecl {
+    auto ast_node = new c_ast::DeclASTVar();
+    ast_node->var_decl = std::unique_ptr<c_ast::BaseAST>($1);
+    $$ = ast_node;
+  }
+  ;
+
+BType
+  : INT {
+    auto* ast_node = new c_ast::BTypeAST();
+    ast_node->type = c_ast::PrimitiveType::INT;
+    $$ = ast_node;
+  }
   ;
 
 ConstDecl
@@ -89,13 +102,6 @@ ConstDefList
   }
   ;
 
-BType
-  : INT {
-    auto* ast_node = new c_ast::BTypeAST();
-    ast_node->type = c_ast::PrimitiveType::INT;
-    $$ = ast_node;
-  }
-
 ConstDef
   : IDENT '=' ConstInitVal {
     auto* ast_node = new c_ast::ConstDefAST();
@@ -109,6 +115,49 @@ ConstInitVal
   : ConstExp {
     auto* ast_node = new c_ast::ConstInitValAST();
     ast_node->const_exp = std::unique_ptr<c_ast::BaseAST>($1);
+    $$ = ast_node;
+  }
+  ;
+
+VarDecl
+  : BType VarDef VarDefList ';' {
+    auto* ast_node = new c_ast::VarDeclAST();
+    ast_node->btype = std::unique_ptr<c_ast::BaseAST>($1);
+    ast_node->var_def_primary = std::unique_ptr<c_ast::BaseAST>($2);
+    ast_node->var_def_sup = std::move(*$3);
+    delete $3;
+    $$ = ast_node;
+  }
+  ;
+
+VarDefList
+  : /* empty */ {
+    $$ = new std::vector<std::unique_ptr<c_ast::BaseAST>>();
+  }
+  | VarDefList ',' VarDef {
+    $1->push_back(std::unique_ptr<c_ast::BaseAST>($3));
+    $$ = $1;
+  }
+  ;
+
+VarDef
+  : IDENT {
+    auto* ast_node = new c_ast::VarDefASTIdent();
+    ast_node->ident = *$1; delete $1;
+    $$ = ast_node;
+  }
+  | IDENT '=' InitVal {
+    auto* ast_node = new c_ast::VarDefASTIdentInit();
+    ast_node->ident = *$1; delete $1;
+    ast_node->var_init_val = std::unique_ptr<c_ast::BaseAST>($3);
+    $$ = ast_node;
+  }
+  ;
+
+InitVal
+  : Exp {
+    auto* ast_node = new c_ast::InitValAST();
+    ast_node->exp = std::unique_ptr<c_ast::BaseAST>($1);
     $$ = ast_node;
   }
   ;
@@ -156,11 +205,15 @@ BlockItem
   ;
 
 Stmt
-  : RETURN Exp ';' {
-    auto ast_node = new c_ast::StmtAST();
-    
+  : LVal '=' Exp ';' {
+    auto ast_node = new c_ast::StmtASTAssign();
+    ast_node->lval = std::unique_ptr<c_ast::BaseAST>($1);
+    ast_node->exp = std::unique_ptr<c_ast::BaseAST>($3);
+    $$ = ast_node;
+  }
+  | RETURN Exp ';' {
+    auto ast_node = new c_ast::StmtASTReturn();
     ast_node->exp = std::unique_ptr<c_ast::BaseAST>($2);
-
     $$ = ast_node;
   }
   ;

@@ -107,7 +107,18 @@ public:
     std::cout << "DeclAST { ";
     const_decl->Dump();
     std::cout << " }";
-  };
+  }
+};
+
+class DeclASTVar final : public DeclAST {
+public:
+  std::unique_ptr<BaseAST> var_decl;
+
+  void Dump() const override {
+    std::cout << "DeclAST { ";
+    var_decl->Dump();
+    std::cout << " }";
+  }
 };
 
 class ConstDeclAST final : public BaseAST {
@@ -163,6 +174,64 @@ public:
   }
 };
 
+class VarDeclAST final : public BaseAST {
+public:
+  std::unique_ptr<BaseAST> btype;
+  std::unique_ptr<BaseAST> var_def_primary;
+  std::vector<std::unique_ptr<BaseAST>> var_def_sup;
+
+  void Dump() const override {
+    std::cout << "VarDeclAST { BType: ";
+    btype->Dump();
+    std::cout << " , VarDef: ";
+    var_def_primary->Dump();
+    for (auto &const_def : this->var_def_sup) {
+      std::cout << " , VarDef: ";
+      const_def->Dump();
+    }
+    std::cout << " }";
+  }
+};
+
+class VarDefAST : public BaseAST {
+public:
+  virtual ~VarDefAST() = default;
+};
+
+class VarDefASTIdent final : public VarDefAST {
+public:
+  std::string ident;
+
+  void Dump() const override {
+    std::cout << "VarDefAST { ";
+    std::cout << "IDENT: " << ident << " }";
+  }
+};
+
+class VarDefASTIdentInit final : public VarDefAST {
+public:
+  std::string ident;
+  std::unique_ptr<BaseAST> var_init_val;
+
+  void Dump() const override {
+    std::cout << "VarDefAST { ";
+    std::cout << "IDENT: " << ident << " , ";
+    var_init_val->Dump();
+    std::cout << " }";
+  }
+};
+
+class InitValAST final : public BaseAST {
+public:
+  std::unique_ptr<BaseAST> exp;
+
+  void Dump() const override {
+    std::cout << "InitValAST { ";
+    exp->Dump();
+    std::cout << " }";
+  }
+};
+
 class FuncDefAST final : public BaseAST {
 public:
   std::unique_ptr<BaseAST> func_type;
@@ -202,14 +271,33 @@ public:
   }
 };
 
-class StmtAST final : public BaseAST {
+class StmtAST : public BaseAST {
+public:
+  virtual ~StmtAST() = default;
+};
+
+class StmtASTReturn final : public StmtAST {
 public:
   std::unique_ptr<BaseAST> exp;
 
   void Dump() const override {
-    std::cout << "StmtAST { ";
+    std::cout << "StmtAST { return ";
     exp->Dump();
     std::cout << " }";
+  }
+};
+
+class StmtASTAssign final : public StmtAST {
+public:
+  std::unique_ptr<BaseAST> lval;
+  std::unique_ptr<BaseAST> exp;
+
+  void Dump() const override {
+    std::cout << "StmtAST { assignment=(LVal: ";
+    lval->Dump();
+    std::cout << " , ";
+    exp->Dump();
+    std::cout << " ) }";
   }
 };
 

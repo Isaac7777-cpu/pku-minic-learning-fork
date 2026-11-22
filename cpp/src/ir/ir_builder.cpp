@@ -205,7 +205,11 @@ void translate_stmt_c_ast(const c_ast::StmtAST &stmt,
                           koopa_ast::BasicBlock &block,
                           const Scope &constants) {
   // Cast and check that it has the correct type
-  auto *exp = dynamic_cast<const c_ast::ExpAST *>(stmt.exp.get());
+  auto *return_stmt = dynamic_cast<const c_ast::StmtASTReturn *>(&stmt);
+
+  if (!return_stmt)
+    throw std::runtime_error("Assignment IR generation not implemented yet");
+  auto *exp = dynamic_cast<const c_ast::ExpAST *>(return_stmt->exp.get());
   if (!exp)
     throw std::runtime_error(
         "ir_builder error: StmtAST expects ExpAST at param `exp`");
