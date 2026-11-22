@@ -17,8 +17,12 @@ std::unique_ptr<koopa_ast::Type>
 translate_func_type_c_ast(const c_ast::FuncTypeAST &);
 std::unique_ptr<koopa_ast::BasicBlock>
 translate_block_c_ast(const c_ast::BlockAST &, std::string = "");
+void translate_block_item_c_ast(const c_ast::BaseAST &, koopa_ast::BasicBlock &,
+                                Scope &);
 void translate_stmt_c_ast(const c_ast::StmtAST &, koopa_ast::BasicBlock &,
                           const Scope &);
+void translate_decl_c_ast(const c_ast::DeclAST &, koopa_ast::BasicBlock &,
+                          Scope &);
 koopa_ast::Value *translate_exp_c_ast(const c_ast::ExpAST &,
                                       koopa_ast::BasicBlock &, const Scope &);
 koopa_ast::Value *translate_primary_exp_c_ast(const c_ast::PrimaryAST &,
@@ -166,35 +170,27 @@ translate_block_c_ast(const c_ast::BlockAST &block, std::string name) {
   // TODO: Sufficient for the single function block supported at this stage.
   Scope scope;
 
-  for (auto &decl_or_stmt : block.block_items) {
-    if (auto *stmt = dynamic_cast<const c_ast::StmtAST *>(decl_or_stmt.get())) {
-      translate_stmt_c_ast(*stmt, *block_koopa, scope);
-      // WARNING: This should be handled better when there are many other
-      // statements
-      break;
-    } else if (auto *decl = dynamic_cast<const c_ast::DeclASTConst *>(
-                   decl_or_stmt.get())) {
-      auto *const_decl =
-          dynamic_cast<const c_ast::ConstDeclAST *>(decl->const_decl.get());
-      if (!const_decl) {
-        throw std::runtime_error("ir_builder error: DeclASTConst expects "
-                                 "ConstDeclAST in `const_decl`");
-      }
+  for (auto &block_item : block.block_items) {
+    translate_block_item_c_ast(*block_item, *block_koopa, scope);
 
-      // const int a = 2, b = a + 3, c = b * 4;
-      //           ^ first definition
-      define_constant(*const_decl->const_def_primary, scope);
-      // const int a = 2, b = a + 3, c = b * 4;
-      //                  ^ remaining definitions, in order
-      for (const auto &def : const_decl->const_def_sup) {
-        define_constant(*def, scope);
-      }
-    } else {
-      throw std::runtime_error("ir_builder error: BlockAST expects to have "
-                               "StmtAST or DeclAST in vector `block_items`");
+    if (dynamic_cast<const c_ast::StmtASTReturn *>(block_item.get())) {
+      break;
     }
   }
   return block_koopa;
+}
+
+void translate_block_item_c_ast(const c_ast::BaseAST &block_item,
+                                koopa_ast::BasicBlock &block_koopa,
+                                Scope &scope) {
+  if (auto *stmt = dynamic_cast<const c_ast::StmtAST *>(&block_item)) {
+    translate_stmt_c_ast(*stmt, block_koopa, scope);
+  } else if (auto *decl = dynamic_cast<const c_ast::DeclAST *>(&block_item)) {
+    translate_decl_c_ast(*decl, block_koopa, scope);
+  } else {
+    throw std::runtime_error("ir_builder error: BlockAST expects to have "
+                             "StmtAST or DeclAST in vector `block_items`");
+  }
 }
 
 /**
@@ -219,6 +215,30 @@ void translate_stmt_c_ast(const c_ast::StmtAST &stmt,
 
   // Only needs to emit the IR instruction, no need to return the pointer.
   block.Make<koopa_ast::Return>(true, val);
+}
+
+void translate_decl_c_ast(const c_ast::DeclAST &decl,
+                          koopa_ast::BasicBlock &block, Scope &scope) {
+  if (auto *decl_const = dynamic_cast<const c_ast::DeclASTConst *>(&decl)) {
+    auto *const_decl =
+        dynamic_cast<const c_ast::ConstDeclAST *>(decl_const->const_decl.get());
+    if (!const_decl) {
+      throw std::runtime_error("ir_builder error: DeclASTConst expects "
+                               "ConstDeclAST in `const_decl`");
+    }
+
+    // const int a = 2, b = a + 3, c = b * 4;
+    //           ^ first definition
+    define_constant(*const_decl->const_def_primary, scope);
+    // const int a = 2, b = a + 3, c = b * 4;
+    //                  ^ remaining definitions, in order
+    for (const auto &def : const_decl->const_def_sup) {
+      define_constant(*def, scope);
+    }
+  } else {
+    throw std::runtime_error(
+        "Variable declaration IR generation not implemented yet");
+  }
 }
 
 /**
@@ -601,7 +621,8 @@ koopa_ast::Value *translate_lor_exp_c_ast(const c_ast::LOrExpAST &lor,
 }
 
 /*
- * Helpers
+ * Helpers for evaluating the constant.
+ * TODO: Perhaps refactor this into a separate file to keep this file small.
  */
 int32_t eval_const(const c_ast::BaseAST &node, const Scope &scope) {
   // Calculate arithmetic. First in 64 bits then convert to 32.
